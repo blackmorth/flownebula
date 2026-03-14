@@ -1,15 +1,11 @@
 #include "php_flownebula.h"
+#include <main/php_main.h>
 #include <stdio.h>
 #include <stdlib.h>
-#if defined(_WIN32) || defined(_WIN64)
-# include <windows.h>
-#else
-# include <time.h>
-#endif
 
 static FILE *trace_file = NULL;
 
-nebula_execute_ex_fn original_execute_ex;
+void (*original_execute_ex)(zend_execute_data *execute_data);
 
 static nebula_frame stack[NEBULA_MAX_STACK];
 static int stack_top = 0;
@@ -35,22 +31,12 @@ PHP_INI_END()
 
 
 /* -----------------------------
-   High resolution timer (portable, no zend_hrtime.h dependency)
+   High resolution timer
 ----------------------------- */
 
 uint64_t nebula_time(void)
 {
-#if defined(_WIN32) || defined(_WIN64)
-    LARGE_INTEGER freq, count;
-    if (QueryPerformanceFrequency(&freq) && QueryPerformanceCounter(&count))
-        return (uint64_t)((count.QuadPart * 1000000000ULL) / freq.QuadPart);
-    return (uint64_t)GetTickCount64() * 1000000ULL;
-#else
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
-        return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
-    return 0;
-#endif
+    return (uint64_t) zend_hrtime(true);
 }
 
 
@@ -62,8 +48,8 @@ void nebula_trace_open()
 {
     const char *path = NULL;
 
-    if (FLOWNEBULA_G(trace_path) && FLOWNEBULA_ZSTR_LEN(FLOWNEBULA_G(trace_path)) > 0) {
-        path = FLOWNEBULA_ZSTR_VAL(FLOWNEBULA_G(trace_path));
+    if (FLOWNEBULA_G(trace_path) && ZSTR_LEN(FLOWNEBULA_G(trace_path)) > 0) {
+        path = ZSTR_VAL(FLOWNEBULA_G(trace_path));
     } else {
         const char *env = getenv("FLOWNEBULA_TRACE");
 
@@ -113,7 +99,7 @@ void nebula_execute_ex(zend_execute_data *execute_data)
     const char *fname = "main";
 
     if (func->common.function_name) {
-        fname = FLOWNEBULA_ZSTR_VAL(func->common.function_name);
+        fname = ZSTR_VAL(func->common.function_name);
     }
 
     uint64_t start = nebula_time();
