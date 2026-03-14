@@ -5,4 +5,3 @@ ARG_ENABLE("flownebula", "whether to enable FlowNebula profiler", "no");
 if (PHP_FLOWNEBULA != "no") {
 	EXTENSION("flownebula", "flownebula.c");
 }
-

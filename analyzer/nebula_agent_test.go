@@ -78,4 +78,3 @@ func assertEdgeGo(t *testing.T, edges map[string]Edge, key string, calls int, ti
 		t.Fatalf("edge %s: expected mem=%d, got %d", key, mem, e.MemTotal)
 	}
 }
-

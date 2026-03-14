@@ -70,4 +70,3 @@ function assertEdge(array $edges, string $key, int $calls, int $time, int $mem):
         exit(1);
     }
 }
-

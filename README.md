@@ -27,6 +27,61 @@ php analyzer/build_graph.php /tmp/nebula.trace nebula.json
 Open viewer/index.html in browser
 
 
+## Docker (Linux, macOS, Windows)
+
+You can run FlowNebula entirely inside Docker, regardless of your host OS.
+
+### Build the image
+
+```bash
+docker build -t flownebula .
+```
+
+Or with docker compose:
+
+```bash
+docker compose build
+```
+
+### Run a profiled script
+
+By default the image already has the extension compiled and enabled.
+You can run the example script like this:
+
+```bash
+docker compose run --rm flownebula php examples/test.php
+```
+
+This will generate a trace file inside the container at `/tmp/nebula.trace`
+(also mounted to `./data/nebula.trace` on the host by default).
+
+### Build the graph inside Docker
+
+Generate `nebula.json` from the trace:
+
+```bash
+docker compose run --rm flownebula \
+  php analyzer/build_graph.php /tmp/nebula.trace /tmp/nebula.json
+```
+
+The resulting JSON will be available on the host at `./data/nebula.json`.
+
+### View the graph
+
+Start the HTTP server that serves the viewer:
+
+```bash
+docker compose up flownebula
+```
+
+Then open in your browser:
+
+```
+http://localhost:8080
+```
+
+The viewer will load `nebula.json` from the container (backed by the `./data`
+directory on the host).
 
 
 
