@@ -27,7 +27,7 @@ jobs:
             -w /core \
             php:${{ matrix.php }}-cli bash -c '
               apt-get update -qq && apt-get install -y -qq autoconf build-essential pkg-config > /dev/null
-              phpize && ./configure --enable-flownebula && make
+              phpize && ./configure --enable-flownebula && make > /dev/null 2>&1
               cat modules/flownebula.so
             ' > flownebula-php${{ matrix.php }}.so
 
