@@ -68,8 +68,8 @@ jobs:
               apt-get update -qq && apt-get install -y -qq autoconf build-essential pkg-config > /dev/null
               cd /app/core && phpize && ./configure --enable-flownebula && make install
               echo "extension=flownebula.so" >> /usr/local/etc/php/conf.d/flownebula.ini
-              echo "flownebula.trace_path=/tmp/nebula.trace" >> /usr/local/etc/php/conf.d/flownebula.ini
+              echo "flownebula.trace_path=/app/nebula.trace" >> /usr/local/etc/php/conf.d/flownebula.ini
               php /app/examples/test.php
-              php /app/analyzer/build_graph.php /tmp/nebula.trace /tmp/nebula.json
-              test -f /tmp/nebula.json && echo "Trace and graph OK"
+              php /app/analyzer/build_graph.php /app/nebula.trace /app/nebula.json
+              test -f /app/nebula.json && echo "Trace and graph OK"
             '
