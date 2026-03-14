@@ -1,7 +1,16 @@
 #include "php_flownebula.h"
-#include <main/php_main.h>
 #include <stdio.h>
 #include <stdlib.h>
+#if defined(_WIN32) || defined(_WIN64)
+# include <windows.h>
+#else
+# include <time.h>
+#endif
+
+/* php_info_* may be in main/php_main.h; declare locally for portability */
+PHPAPI void php_info_print_table_start(void);
+PHPAPI void php_info_print_table_row(int num_cols, ...);
+PHPAPI void php_info_print_table_end(void);
 
 static FILE *trace_file = NULL;
 
@@ -31,12 +40,22 @@ PHP_INI_END()
 
 
 /* -----------------------------
-   High resolution timer
+   High resolution timer (portable, no zend_hrtime dependency)
 ----------------------------- */
 
 uint64_t nebula_time(void)
 {
-    return (uint64_t) zend_hrtime(true);
+#if defined(_WIN32) || defined(_WIN64)
+    LARGE_INTEGER freq, count;
+    if (QueryPerformanceFrequency(&freq) && QueryPerformanceCounter(&count))
+        return (uint64_t)((count.QuadPart * 1000000000ULL) / freq.QuadPart);
+    return (uint64_t)GetTickCount64() * 1000000ULL;
+#else
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+        return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return 0;
+#endif
 }
 
 
