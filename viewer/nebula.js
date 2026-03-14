@@ -1,5 +1,12 @@
-fetch("../nebula.json")
-    .then(r => r.json())
+// Works both: Docker (served at /viewer/, JSON at /nebula.json) and local (../nebula.json)
+const jsonUrl = (typeof window !== "undefined" && window.location.pathname.indexOf("/viewer") !== -1)
+    ? "/nebula.json"
+    : "../nebula.json";
+fetch(jsonUrl)
+    .then(r => {
+        if (!r.ok) throw new Error("nebula.json not found. Run the profiler and build_graph first.");
+        return r.json();
+    })
     .then(data => {
 
         const nodes = {};
@@ -163,4 +170,7 @@ fetch("../nebula.json")
             d.fx = null;
             d.fy = null;
         }
+    })
+    .catch(err => {
+        document.body.innerHTML = "<p style='padding:1rem;color:#c00'>" + err.message + "</p>";
     });

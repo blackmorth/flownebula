@@ -1,8 +1,27 @@
 # FlowNebula
 
-Local PHP profiler that generates call graphs.
+Local PHP profiler that generates call graphs (time + memory), with a D3 viewer.
 
-## Build extension
+**Quick start (Docker, any OS):** clone, then run:
+
+```bash
+docker compose build
+docker compose run --rm flownebula php examples/test.php
+docker compose run --rm flownebula php analyzer/build_graph.php /tmp/nebula.trace /app/nebula.json
+docker compose up flownebula
+```
+
+Open **http://localhost:8080/viewer/** in your browser.
+
+**Run tests (optional):**  
+- Analyzer PHP: `php analyzer/build_graph_test.php`  
+- Agent Go: `cd analyzer && go test`
+
+**CI & Releases:** GitHub Actions build the extension on PHP 8.1–8.4 on every push/PR. Pushing a tag `v*` (e.g. `v0.1.0`) triggers a release with prebuilt `.so` files for each PHP version.
+
+---
+
+## Build extension (without Docker)
 
 cd core
 
@@ -57,18 +76,18 @@ This will generate a trace file inside the container at `/tmp/nebula.trace`
 
 ### Build the graph inside Docker
 
-Generate `nebula.json` from the trace:
+Generate `nebula.json` (output to `/app/nebula.json` so the viewer can load it):
 
 ```bash
 docker compose run --rm flownebula \
-  php analyzer/build_graph.php /tmp/nebula.trace /tmp/nebula.json
+  php analyzer/build_graph.php /tmp/nebula.trace /app/nebula.json
 ```
 
-The resulting JSON will be available on the host at `./data/nebula.json`.
+The file will appear at the project root on the host and is served at `/nebula.json` when the viewer runs.
 
 ### View the graph
 
-Start the HTTP server that serves the viewer:
+Start the HTTP server:
 
 ```bash
 docker compose up flownebula
@@ -77,11 +96,10 @@ docker compose up flownebula
 Then open in your browser:
 
 ```
-http://localhost:8080
+http://localhost:8080/viewer/
 ```
 
-The viewer will load `nebula.json` from the container (backed by the `./data`
-directory on the host).
+The viewer loads `/nebula.json` from the same server.
 
 
 

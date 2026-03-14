@@ -1,0 +1,32 @@
+# Build (extension)
+core/modules/
+core/*.lo
+core/*.la
+core/.libs/
+core/Makefile
+core/Makefile.fragments
+core/config.h
+core/config.log
+core/config.status
+core/configure
+core/configure.ac
+core/run-tests.php
+
+# Traces and output
+*.trace
+nebula.json
+data/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Go
+analyzer/nebula-agent
+analyzer/nebula_agent
+
+# PHP
+.phpunit.result.cache
+vendor/

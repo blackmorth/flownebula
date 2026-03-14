@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.1", "8.2", "8.3", "8.4"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build extension
+        id: build
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/core:/core" \
+            -w /core \
+            php:${{ matrix.php }}-cli bash -c '
+              apt-get update -qq && apt-get install -y -qq autoconf build-essential pkg-config > /dev/null
+              phpize && ./configure --enable-flownebula && make
+              cat modules/flownebula.so
+            ' > flownebula-php${{ matrix.php }}.so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flownebula-php${{ matrix.php }}
+          path: flownebula-php${{ matrix.php }}.so
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release
+          for dir in artifacts/flownebula-php*/; do
+            [ -d "$dir" ] || continue
+            for so in "$dir"*.so; do
+              [ -f "$so" ] && cp "$so" release/
+            done
+          done
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Built for PHP 8.1, 8.2, 8.3 and 8.4 on Linux (Ubuntu).
+            Rename the `.so` file to `flownebula.so` and load it in your `php.ini`:
+            ```ini
+            extension=flownebula.so
+            flownebula.trace_path=/path/to/nebula.trace
+            ```
+          files: release/*.so
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
