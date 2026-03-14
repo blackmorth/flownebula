@@ -15,7 +15,7 @@ Open **http://localhost:8080/viewer/** in your browser.
 
 **Run tests (optional):**  
 - Analyzer PHP: `php analyzer/build_graph_test.php`  
-- Agent Go: `cd analyzer && go test`
+- Agent Go: `cd analyzer && go test .`
 
 **CI & Releases:** GitHub Actions build the extension on PHP 8.1–8.4 on every push/PR. Pushing a tag `v*` (e.g. `v0.1.0`) triggers a release with prebuilt `.so` files for each PHP version.
 

@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Go tests (agent)
         run: |
-          cd analyzer && go test -v ./...
+          cd analyzer && go test -v .
 
   test-php-script:
     name: Run example with extension (PHP 8.2)
