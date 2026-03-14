@@ -34,6 +34,26 @@ jobs:
         run: |
           cd analyzer && go test -v .
 
+  node-viewer:
+    name: Node (LTS 24) – viewer check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Check viewer JS
+        run: |
+          node -e "
+            const fs = require('fs');
+            const code = fs.readFileSync('viewer/nebula.js', 'utf8');
+            if (!code.includes('fetch') || !code.includes('d3')) throw new Error('viewer/nebula.js invalid');
+            console.log('viewer/nebula.js OK');
+          "
+
   test-php-script:
     name: Run example with extension (PHP 8.2)
     runs-on: ubuntu-latest
