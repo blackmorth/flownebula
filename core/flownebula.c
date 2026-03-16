@@ -1,10 +1,16 @@
 #include "php_flownebula.h"
-#include <stdio.h>
-#include <stdlib.h>
+
 #if defined(_WIN32) || defined(_WIN64)
 # include <windows.h>
+# include <winsock2.h>
+# include <ws2tcpip.h>
 #else
 # include <time.h>
+# include <sys/types.h>
+# include <sys/socket.h>
+# include <netdb.h>
+# include <unistd.h>   // close(), write()
+# include <string.h>   // strncpy()
 #endif
 
 /* php_info_* may be in main/php_main.h; declare locally for portability */
@@ -13,6 +19,8 @@ PHPAPI void php_info_print_table_row(int num_cols, ...);
 PHPAPI void php_info_print_table_end(void);
 
 static FILE *trace_file = NULL;
+
+static int agent_socket = -1;
 
 void (*original_execute_ex)(zend_execute_data *execute_data);
 
@@ -38,6 +46,24 @@ PHP_INI_BEGIN()
     )
 PHP_INI_END()
 
+
+// helper pour écrire ligne dans fichier ou agent
+static void nebula_write_trace_line(const char *caller, const char *fname, uint64_t duration, size_t mem_delta)
+{
+    if (trace_file) {
+        fprintf(trace_file, "%s %s %llu %zu\n", caller, fname,
+            (unsigned long long)duration, mem_delta);
+    } else if (agent_socket >= 0) {
+        char buf[512];
+        int n = snprintf(buf, sizeof(buf), "%s %s %llu %zu\n", caller, fname,
+            (unsigned long long)duration, mem_delta);
+#ifdef _WIN32
+        send(agent_socket, buf, n, 0);
+#else
+        write(agent_socket, buf, n);
+#endif
+    }
+}
 
 /* -----------------------------
    High resolution timer (portable, no zend_hrtime dependency)
@@ -65,39 +91,81 @@ uint64_t nebula_time(void)
 
 void nebula_trace_open()
 {
-    const char *path = NULL;
+    const char *agent_addr = getenv("FLOWNEBULA_AGENT_ADDR");
+    php_error_docref(NULL, E_NOTICE, "FlowNebula: Starting trace_open. Agent addr: %s", agent_addr ? agent_addr : "NULL");
+    php_error_docref(NULL, E_NOTICE, "FlowNebula: trace_path length: %zu, value: '%s'",
+        FLOWNEBULA_G(trace_path) ? ZSTR_LEN(FLOWNEBULA_G(trace_path)) : 0,
+        FLOWNEBULA_G(trace_path) ? ZSTR_VAL(FLOWNEBULA_G(trace_path)) : "NULL");
 
-    if (FLOWNEBULA_G(trace_path) && ZSTR_LEN(FLOWNEBULA_G(trace_path)) > 0) {
-        path = ZSTR_VAL(FLOWNEBULA_G(trace_path));
-    } else {
-        const char *env = getenv("FLOWNEBULA_TRACE");
+    // Priorité à l'agent si configuré
+    if (agent_addr) {
+        php_error_docref(NULL, E_NOTICE, "FlowNebula: Using agent at: %s", agent_addr);
+        char host[256], port[16];
+        const char *sep = strchr(agent_addr, ':');
+        if (!sep) {
+            php_error_docref(NULL, E_WARNING, "FlowNebula: Invalid agent address format (expected host:port)");
+            return;
+        }
+        size_t hlen = sep - agent_addr;
+        strncpy(host, agent_addr, hlen);
+        host[hlen] = '\0';
+        strncpy(port, sep+1, sizeof(port)-1);
+        port[sizeof(port)-1] = '\0';
 
-        if (env && env[0] != '\0') {
-            path = env;
+        struct addrinfo hints = {0}, *res;
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        if (getaddrinfo(host, port, &hints, &res) != 0) {
+            php_error_docref(NULL, E_WARNING, "FlowNebula: Failed to resolve agent address");
+            return;
+        }
+
+        agent_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        if (agent_socket < 0) {
+            php_error_docref(NULL, E_WARNING, "FlowNebula: Failed to create socket (errno=%d)", errno);
+            freeaddrinfo(res);
+            return;
+        }
+
+        if (connect(agent_socket, res->ai_addr, res->ai_addrlen) < 0) {
+            php_error_docref(NULL, E_WARNING, "FlowNebula: Failed to connect to agent (errno=%d)", errno);
+            close(agent_socket);
+            agent_socket = -1;
+            // Si la connexion échoue, on pourrait basculer vers un fichier ici (optionnel)
         } else {
-#ifdef _WIN32
-            path = "C:\\tmp\\nebula.trace";
-#else
-            path = "/tmp/nebula.trace";
-#endif
+            php_error_docref(NULL, E_NOTICE, "FlowNebula: Connected to agent successfully!");
+        }
+        freeaddrinfo(res);
+    }
+    // Sinon, si un chemin de fichier NON VIDE est configuré, utilise-le
+    else if (FLOWNEBULA_G(trace_path) && ZSTR_LEN(FLOWNEBULA_G(trace_path)) > 0) {
+        const char *path = ZSTR_VAL(FLOWNEBULA_G(trace_path));
+        php_error_docref(NULL, E_NOTICE, "FlowNebula: Using file path: %s", path);
+        trace_file = fopen(path, "w");
+        if (!trace_file) {
+            php_error_docref(NULL, E_WARNING, "FlowNebula: Cannot open trace file '%s'", path);
+        } else {
+            setvbuf(trace_file, NULL, _IOLBF, 0);
         }
     }
-
-    trace_file = fopen(path, "w");
-
-    if (!trace_file) {
-        php_error_docref(NULL, E_WARNING,
-            "FlowNebula: failed to open trace file '%s' for writing",
-            path
-        );
+    // Aucune configuration valide
+    else {
+        php_error_docref(NULL, E_WARNING, "FlowNebula: No valid trace configuration. Traces will be lost.");
     }
 }
 
+
+
 void nebula_trace_close()
 {
-    if (trace_file) {
-        fclose(trace_file);
-        trace_file = NULL;
+    if (trace_file) { fflush(trace_file); fclose(trace_file); trace_file = NULL; }
+    if (agent_socket >= 0) {
+#ifdef _WIN32
+        closesocket(agent_socket);
+#else
+        close(agent_socket);
+#endif
+        agent_socket = -1;
     }
 }
 
@@ -109,6 +177,7 @@ void nebula_trace_close()
 void nebula_execute_ex(zend_execute_data *execute_data)
 {
     if (stack_top >= NEBULA_MAX_STACK) {
+        php_error_docref(NULL, E_WARNING, "FlowNebula: stack overflow, increase NEBULA_MAX_STACK");
         original_execute_ex(execute_data);
         return;
     }
@@ -117,9 +186,15 @@ void nebula_execute_ex(zend_execute_data *execute_data)
 
     const char *fname = "main";
 
-    if (func->common.function_name) {
+    if (func->common.scope) {
+    // Cas d'une méthode de classe
+    fname = "class_method";
+    } else if (func->common.function_name) {
         fname = ZSTR_VAL(func->common.function_name);
+    } else {
+        fname = "main";
     }
+
 
     uint64_t start = nebula_time();
     size_t   mem_before = zend_memory_usage(0);
@@ -152,16 +227,7 @@ void nebula_execute_ex(zend_execute_data *execute_data)
         caller = stack[stack_top - 1].function;
     }
 
-    if (trace_file) {
-        fprintf(
-            trace_file,
-            "%s %s %llu %zu\n",
-            caller,
-            fname,
-            (unsigned long long) duration,
-            (size_t) mem_delta
-        );
-    }
+    nebula_write_trace_line(caller, fname, duration, mem_delta);
 }
 
 

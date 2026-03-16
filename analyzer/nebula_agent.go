@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -20,6 +22,16 @@ type Edge struct {
 }
 
 func main() {
+
+	daemon := flag.Bool("daemon", false, "run agent in background")
+	flag.BoolVar(daemon, "d", false, "run agent in background (shorthand)")
+	flag.Parse()
+
+	if *daemon && os.Getenv("FLOWNEBULA_DAEMONIZED") == "" {
+		daemonize()
+		return
+	}
+
 	addr := getenvDefault("FLOWNEBULA_AGENT_ADDR", "127.0.0.1:8135")
 	outPath := getenvDefault("FLOWNEBULA_AGENT_OUT", "nebula.json")
 
@@ -41,6 +53,7 @@ func main() {
 		}
 
 		log.Printf("new connection from %s", conn.RemoteAddr())
+
 		if err := handleConn(conn, edges); err != nil {
 			log.Printf("connection error: %v", err)
 		}
@@ -51,12 +64,34 @@ func main() {
 	}
 }
 
+func daemonize() {
+
+	logFile, err := os.OpenFile("flownebula-agent.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatalf("cannot open log file: %v", err)
+	}
+
+	cmd := exec.Command(os.Args[0], os.Args[1:]...)
+	cmd.Env = append(os.Environ(), "FLOWNEBULA_DAEMONIZED=1")
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	cmd.Stdin = nil
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatalf("failed to start daemon: %v", err)
+	}
+
+	fmt.Printf("FlowNebula agent started in background (PID %d)\n", cmd.Process.Pid)
+}
+
 func handleConn(conn net.Conn, edges map[string]*Edge) error {
 	defer conn.Close()
 
 	scanner := bufio.NewScanner(conn)
 
 	for scanner.Scan() {
+
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
@@ -64,31 +99,21 @@ func handleConn(conn net.Conn, edges map[string]*Edge) error {
 
 		parts := strings.Fields(line)
 		if len(parts) < 3 {
-			log.Printf("invalid line (expected at least 3 fields): %q", line)
+			log.Printf("invalid line: %q", line)
 			continue
 		}
 
 		caller := parts[0]
 		callee := parts[1]
-		durStr := parts[2]
-		memStr := ""
-		if len(parts) >= 4 {
-			memStr = parts[3]
-		}
 
-		dur, err := strconv.ParseInt(durStr, 10, 64)
+		dur, err := strconv.ParseInt(parts[2], 10, 64)
 		if err != nil {
-			log.Printf("invalid duration %q in line %q: %v", durStr, line, err)
 			continue
 		}
 
 		var memDelta int64
-		if memStr != "" {
-			memDelta, err = strconv.ParseInt(memStr, 10, 64)
-			if err != nil {
-				log.Printf("invalid mem %q in line %q: %v", memStr, line, err)
-				memDelta = 0
-			}
+		if len(parts) >= 4 {
+			memDelta, _ = strconv.ParseInt(parts[3], 10, 64)
 		}
 
 		key := caller + "->" + callee
@@ -96,11 +121,8 @@ func handleConn(conn net.Conn, edges map[string]*Edge) error {
 		e, ok := edges[key]
 		if !ok {
 			e = &Edge{
-				Caller:   caller,
-				Callee:   callee,
-				Calls:    0,
-				Time:     0,
-				MemTotal: 0,
+				Caller: caller,
+				Callee: callee,
 			}
 			edges[key] = e
 		}
@@ -110,14 +132,11 @@ func handleConn(conn net.Conn, edges map[string]*Edge) error {
 		e.MemTotal += memDelta
 	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error: %w", err)
-	}
-
-	return nil
+	return scanner.Err()
 }
 
 func writeGraph(path string, edges map[string]*Edge) error {
+
 	values := make([]*Edge, 0, len(edges))
 	for _, e := range edges {
 		values = append(values, e)
@@ -125,15 +144,10 @@ func writeGraph(path string, edges map[string]*Edge) error {
 
 	data, err := json.MarshalIndent(values, "", "  ")
 	if err != nil {
-		return fmt.Errorf("json marshal: %w", err)
+		return err
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return fmt.Errorf("write file: %w", err)
-	}
-
-	log.Printf("graph written to %s (%d edges)", path, len(values))
-	return nil
+	return os.WriteFile(path, data, 0644)
 }
 
 func getenvDefault(key, def string) string {
