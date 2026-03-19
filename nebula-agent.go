@@ -1,189 +1,138 @@
 package main
 
 import (
-	"encoding/binary"
+	"flag"
+	"flownebula/agent"
 	"fmt"
+	"log"
 	"net"
-	"sync"
+	"os"
+	"os/exec"
+	"os/user"
+	"strconv"
 	"time"
 )
 
-type CallEvent struct {
-	Type      uint8
-	FuncID    uint32
-	Inclusive uint64
-	Exclusive uint64
-	MemDelta  int64
-}
-
-type Node struct {
-	FuncID    uint32
-	Calls     uint64
-	Inclusive uint64
-	Exclusive uint64
-	MemDelta  int64
-	Children  map[uint32]*Node
-}
-
-type Session struct {
-	ID       string
-	Root     *Node
-	stack    []*Node
-	LastSeen time.Time
-	mu       sync.Mutex
-}
-
-var (
-	sessions   = make(map[string]*Session)
-	sessionsMu sync.Mutex
-)
-
-func newNode(funcID uint32) *Node {
-	return &Node{
-		FuncID:   funcID,
-		Children: make(map[uint32]*Node),
-	}
-}
-
-func getSession(id string) *Session {
-	sessionsMu.Lock()
-	defer sessionsMu.Unlock()
-
-	if s, ok := sessions[id]; ok {
-		s.LastSeen = time.Now()
-		return s
-	}
-
-	s := &Session{
-		ID:       id,
-		Root:     newNode(0),
-		stack:    []*Node{},
-		LastSeen: time.Now(),
-	}
-	sessions[id] = s
-	return s
-}
-
-func (s *Session) push(n *Node) {
-	s.stack = append(s.stack, n)
-}
-
-func (s *Session) pop() *Node {
-	if len(s.stack) == 0 {
-		return s.Root
-	}
-	n := s.stack[len(s.stack)-1]
-	s.stack = s.stack[:len(s.stack)-1]
-	return n
-}
-
-func (s *Session) top() *Node {
-	if len(s.stack) == 0 {
-		return s.Root
-	}
-	return s.stack[len(s.stack)-1]
-}
-
-func (s *Session) addEvent(ev CallEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	switch ev.Type {
-	case 0: // enter
-		parent := s.top()
-		child, ok := parent.Children[ev.FuncID]
-		if !ok {
-			child = newNode(ev.FuncID)
-			parent.Children[ev.FuncID] = child
-		}
-		s.push(child)
-
-	case 1: // exit
-		node := s.pop()
-		if node.FuncID != ev.FuncID {
-			// désync possible, on ne panique pas
-			node = s.Root
-		}
-		node.Calls++
-		node.Inclusive += ev.Inclusive
-		node.Exclusive += ev.Exclusive
-		node.MemDelta += ev.MemDelta
-	}
-}
-
-func (s *Session) printNode(n *Node, depth int) {
-	prefix := ""
-	for i := 0; i < depth; i++ {
-		prefix += "  "
-	}
-	if n.FuncID != 0 {
-		fmt.Printf("%sFunc %d | Calls=%d | Incl=%d | Excl=%d | Mem=%+d\n",
-			prefix, n.FuncID, n.Calls, n.Inclusive, n.Exclusive, n.MemDelta)
-	}
-	for _, c := range n.Children {
-		s.printNode(c, depth+1)
-	}
-}
-
-func (s *Session) print() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	fmt.Printf("\n=== Session %s ===\n", s.ID)
-	s.printNode(s.Root, 0)
-}
-
-func cleanupSessions() {
-	for range time.Tick(30 * time.Second) {
-		sessionsMu.Lock()
-		for id, s := range sessions {
-			if time.Since(s.LastSeen) > 2*time.Minute {
-				delete(sessions, id)
-			}
-		}
-		sessionsMu.Unlock()
-	}
-}
-
 func main() {
-	addr := net.UDPAddr{Port: 8135, IP: net.ParseIP("127.0.0.1")}
-	conn, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		panic(err)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Printf("Starting Nebula Agent...")
+	var (
+		daemon  = flag.Bool("daemon", false, "Run as daemon (background process)")
+		logFile = flag.String("log", "", "Path to log file")
+		workers = flag.Int("workers", 4, "Number of worker goroutines for event processing")
+	)
+	flag.Parse()
+
+	if *daemon {
+		args := make([]string, 0, len(os.Args)-1)
+		for i := 1; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if arg == "-daemon" || arg == "--daemon" || arg == "-daemon=true" || arg == "--daemon=true" {
+				continue
+			}
+			args = append(args, arg)
+		}
+		cmd := exec.Command(os.Args[0], args...)
+		if *logFile != "" {
+			f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			cmd.Stdout = f
+			cmd.Stderr = f
+		}
+		if err := cmd.Start(); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Nebula Agent started in background with PID %d\n", cmd.Process.Pid)
+		os.Exit(0)
 	}
-	defer conn.Close()
 
-	fmt.Println("Nebula Agent listening on 127.0.0.1:8135")
+	if *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.SetOutput(f)
+		defer func(f *os.File) {
+			err := f.Close()
+			if err != nil {
 
-	go cleanupSessions()
+			}
+		}(f)
+	} else {
+		log.SetOutput(os.Stderr)
+	}
+
+	sockPath := "/var/run/nebula.sock"
+	err := os.Remove(sockPath)
+	if err != nil {
+		return
+	} // au cas où
+
+	addr := net.UnixAddr{Name: sockPath, Net: "unixgram"}
+	conn, err := net.ListenUnixgram("unixgram", &addr)
+	if err != nil {
+		log.Fatalf("Error listening on unix socket: %v", err)
+	}
+	defer func(conn *net.UnixConn) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
+
+	// Permissions correctes pour PHP-FPM
+	uid, gid := detectPHPUser()
+	err = os.Chown(sockPath, uid, gid)
+	if err != nil {
+		return
+	}
+	err = os.Chmod(sockPath, 0660)
+	if err != nil {
+		return
+	}
+
+	log.Printf("Nebula Agent listening on %s", sockPath)
+
+	go agent.CleanupSessions()
 
 	go func() {
 		for range time.Tick(2 * time.Second) {
-			sessionsMu.Lock()
-			for _, s := range sessions {
-				s.print()
+			var activeSessions []*agent.Session
+			for i := 0; i < agent.NumShards; i++ {
+				shard := agent.SessionShards[i]
+				shard.Mu.RLock()
+				for _, s := range shard.Sessions {
+					activeSessions = append(activeSessions, s)
+				}
+				shard.Mu.RUnlock()
 			}
-			sessionsMu.Unlock()
+
+			for _, s := range activeSessions {
+				s.Print()
+			}
 		}
 	}()
 
-	buf := make([]byte, 64)
+	eventChan := make(chan agent.Packet, 10000)
+	agent.StartWorkers(*workers, eventChan)
 
-	for {
-		n, _, err := conn.ReadFromUDP(buf)
-		if err != nil || n < 37 {
-			continue
+	agent.ListenUnixgram(conn, eventChan)
+}
+
+func detectPHPUser() (int, int) {
+	candidates := []string{"www-data", "apache", "nginx", "php"}
+
+	for _, name := range candidates {
+		u, err := user.Lookup(name)
+		if err == nil {
+			uid, _ := strconv.Atoi(u.Uid)
+			gid, _ := strconv.Atoi(u.Gid)
+			return uid, gid
 		}
-
-		sessID := string(buf[:8])
-		ev := CallEvent{
-			Type:      buf[8],
-			FuncID:    binary.LittleEndian.Uint32(buf[9:13]),
-			Inclusive: binary.LittleEndian.Uint64(buf[13:21]),
-			Exclusive: binary.LittleEndian.Uint64(buf[21:29]),
-			MemDelta:  int64(binary.LittleEndian.Uint64(buf[29:37])),
-		}
-
-		s := getSession(sessID)
-		s.addEvent(ev)
 	}
+
+	// fallback: root
+	return os.Getuid(), os.Getgid()
 }
