@@ -1,0 +1,47 @@
+<svg width="320" height="80" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg">
+<defs>
+    <linearGradient id="nebulaGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#4B00E6"/>
+        <stop offset="40%" stop-color="#8A4DFF"/>
+        <stop offset="80%" stop-color="#C9A7FF"/>
+        <stop offset="100%" stop-color="#6A1BFF"/>
+    </linearGradient>
+    <radialGradient id="nebulaGlow" cx="80%" cy="20%" r="60%">
+        <stop offset="0%" stop-color="#8A4DFF" stop-opacity="0.9"/>
+        <stop offset="40%" stop-color="#8A4DFF" stop-opacity="0.2"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+</defs>
+
+<!-- Fond subtil -->
+<rect width="320" height="80" rx="14" fill="#050510"/>
+<rect width="320" height="80" rx="14" fill="url(#nebulaGlow)" opacity="0.7"/>
+
+<!-- Texte Flow -->
+<text x="20" y="48"
+      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif"
+      font-size="32"
+      font-weight="700"
+      fill="url(#nebulaGradient)">
+    Flow
+</text>
+<!-- Texte NEBULA -->
+<text x="120" y="48"
+      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif"
+      font-size="26"
+      font-weight="600"
+      letter-spacing="0.18em"
+      fill="#E5E5FF">
+    NEBULA
+</text>
+
+<!-- Ton mini-logo orbital -->
+<g transform="translate(250, 10) scale(0.45)">
+    <circle cx="60" cy="60" r="28" fill="#8A4DFF" opacity="0.25"/>
+    <circle cx="60" cy="60" r="6" fill="#8A4DFF"/>
+    <path d="M20 60c0-22 18-40 40-40s40 18 40 40-18 40-40 40-40-18-40-40z"
+          stroke="#8A4DFF" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M35 35c15-15 35-15 50 0"
+          stroke="#A87BFF" stroke-width="3" fill="none" opacity="0.6"/>
+</g>
+</svg>

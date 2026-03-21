@@ -74,6 +74,7 @@ PHP_RINIT_FUNCTION(nebula_probe)
 
 PHP_RSHUTDOWN_FUNCTION(nebula_probe)
 {
+    nebula_send_session_end((unsigned char *) NEBULA_G(session_id_ptr));
     flush_buffer();
     return SUCCESS;
 }

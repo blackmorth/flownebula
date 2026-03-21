@@ -1,0 +1,27 @@
+# -----------------------------
+# 1) Build stage
+# -----------------------------
+FROM golang:1.26-alpine AS builder
+
+WORKDIR /src
+
+# Copy entire project (context is project root)
+COPY . .
+
+# Build agent binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o /src/cmd/nebula-agent/nebula-agent ./cmd/nebula-agent/main.go
+
+# -----------------------------
+# 2) Runtime stage
+# -----------------------------
+FROM alpine:latest
+
+WORKDIR /opt/nebula
+
+# Copy binary from builder
+COPY --from=builder /src/cmd/nebula-agent/nebula-agent .
+
+RUN chmod +x /opt/nebula/nebula-agent
+
+CMD ["/opt/nebula/nebula-agent"]

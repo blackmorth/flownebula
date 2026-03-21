@@ -5,6 +5,7 @@
 
 #define SESSION_ID_SIZE 8
 #define NEBULA_EVENT_NAME 255
+#define NEBULA_EVENT_SESSION_END 0xFE
 
 #pragma pack(push, 1)
 

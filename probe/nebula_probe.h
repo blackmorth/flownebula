@@ -10,8 +10,10 @@
 #include <stdatomic.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/un.h>     // ← obligatoire pour sockaddr_un
 #include <time.h>
 #include "nebula_protocol.h"
+
 
 #define NEBULA_STACK_SIZE 256
 #define NEBULA_RING_SIZE  65536
@@ -29,8 +31,6 @@ typedef struct frame_t {
     uint64_t nw_start;
 } frame_t;
 
-struct sockaddr_un agent_addr_un;
-
 ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     zend_bool enabled;
     uint64_t  threshold_ns;
@@ -42,6 +42,7 @@ ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     atomic_uint_fast32_t write_pos;
     int                  udp_fd;
     struct sockaddr_in   agent_addr;
+    struct sockaddr_un   agent_addr_un;
     uint32_t             next_func_id;
     HashTable            func_map;
     char                *session_id_ptr;
@@ -79,6 +80,7 @@ void generate_session_id(char out[SESSION_ID_SIZE]);
 void send_func_name(uint32_t func_id, const char *name);
 void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive, uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network);
 void flush_buffer(void);
+void nebula_send_session_end(unsigned char *session_id);
 
 /* Hooks */
 extern void (*old_execute_ex)(zend_execute_data *execute_data);

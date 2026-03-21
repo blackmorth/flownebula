@@ -1,4 +1,4 @@
-package agent
+package internal
 
 import (
 	"fmt"
@@ -134,6 +134,9 @@ func (s *Session) AddEvent(ev CallEvent) {
 		if int64(ev.PeakMemory) > node.Metrics["pmu"] {
 			node.Metrics["pmu"] = int64(ev.PeakMemory)
 		}
+	case EventSessionEnd:
+		s.Closed = true
+		return
 	}
 }
 
@@ -165,5 +168,56 @@ func CleanupSessions() {
 			}
 			shard.Mu.Unlock()
 		}
+	}
+}
+
+func (s *Session) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Closed = true
+}
+
+func ExportSessionsLoop() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		exportReadySessions()
+	}
+}
+
+func exportReadySessions() {
+	now := time.Now()
+	idleTimeout := 5 * time.Second // ex: session inactive depuis 5s
+
+	for i := 0; i < NumShards; i++ {
+		shard := SessionShards[i]
+		shard.Mu.Lock()
+		for id, s := range shard.Sessions {
+			s.mu.Lock()
+
+			// session déjà exportée → on peut la supprimer
+			if s.Exported {
+				s.mu.Unlock()
+				delete(shard.Sessions, id)
+				continue
+			}
+
+			// session fermée OU inactive depuis un moment
+			if s.Closed || now.Sub(s.LastSeen) > idleTimeout {
+				s.mu.Unlock() // on libère avant Print() qui relock
+				s.Print()
+
+				s.mu.Lock()
+				s.Exported = true
+				s.mu.Unlock()
+
+				delete(shard.Sessions, id)
+				continue
+			}
+
+			s.mu.Unlock()
+		}
+		shard.Mu.Unlock()
 	}
 }

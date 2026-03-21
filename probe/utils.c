@@ -133,3 +133,18 @@ void flush_buffer(void)
     }
     atomic_store(&NEBULA_G(write_pos), 0);
 }
+
+void nebula_send_session_end(unsigned char *session_id)
+{
+    emit_call(
+        NEBULA_EVENT_SESSION_END, // event_type
+        0,                        // func_id
+        0,                        // inclusive
+        0,                        // exclusive
+        0,                        // cpu_time
+        0,                        // mem_delta
+        0,                        // peak_memory
+        0,                        // io_wait
+        0                         // network
+    );
+}

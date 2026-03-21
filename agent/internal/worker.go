@@ -1,4 +1,4 @@
-package agent
+package internal
 
 import (
 	"encoding/binary"
@@ -69,6 +69,8 @@ func ListenUnixgram(conn *net.UnixConn, eventChan chan<- Packet) {
 	for {
 		buf := BufferPool.Get().([]byte)
 		n, _, err := conn.ReadFromUnix(buf)
+		log.Printf("Received %d bytes", n)
+		log.Printf("Raw packet: %x", buf[:n])
 		if err != nil {
 			log.Printf("ReadFromUnix error: %v", err)
 			BufferPool.Put(buf)

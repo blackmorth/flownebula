@@ -1,4 +1,4 @@
-package agent
+package internal
 
 import (
 	"sync"
@@ -18,12 +18,13 @@ type CallEvent struct {
 }
 
 const (
-	EventEnter     = 0
-	EventExit      = 1
-	EventFuncName  = 255
-	SessionIDSize  = 8
-	NameHeaderSize = 17 // 8 (SID) + 1 (Type) + 4 (ID) + 4 (Len)
-	EventSize      = 8 + 1 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 8
+	EventEnter      = 0
+	EventExit       = 1
+	EventFuncName   = 255
+	EventSessionEnd = 254
+	SessionIDSize   = 8
+	NameHeaderSize  = 17 // 8 (SID) + 1 (Type) + 4 (ID) + 4 (Len)
+	EventSize       = 8 + 1 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 8
 )
 
 type Node struct {
@@ -40,6 +41,8 @@ type Session struct {
 	LastSeen  time.Time
 	mu        sync.Mutex
 	nodeCount uint64
+	Closed    bool
+	Exported  bool
 }
 
 type DetailedJSON struct {

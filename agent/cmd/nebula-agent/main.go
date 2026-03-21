@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"flownebula/agent"
+	"flownebula/agent/internal"
+	"flownebula/agent/internal/sampler"
 	"fmt"
 	"log"
 	"net"
@@ -17,9 +18,10 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Printf("Starting Nebula Agent...")
 	var (
-		daemon  = flag.Bool("daemon", false, "Run as daemon (background process)")
-		logFile = flag.String("log", "", "Path to log file")
-		workers = flag.Int("workers", 4, "Number of worker goroutines for event processing")
+		daemon    = flag.Bool("daemon", false, "Run as daemon (background process)")
+		logFile   = flag.String("log", "", "Path to log file")
+		workers   = flag.Int("workers", 4, "Number of worker goroutines for event processing")
+		samplePID = flag.Int("sample-pid", 0, "PID to CPU-sample with perf_event_open")
 	)
 	flag.Parse()
 
@@ -63,62 +65,58 @@ func main() {
 	} else {
 		log.SetOutput(os.Stderr)
 	}
+	// --- sampler CPU (toujours actif si flag présent) ---
+	if *samplePID > 0 {
+		fd, err := sampler.StartCPUSampler(*samplePID, 99)
+		if err != nil {
+			log.Printf("perf sampler error: %v", err)
+		} else {
+			samples := make(chan sampler.Sample, 1024)
+			go sampler.ReadSamples(fd, samples)
+
+			go func() {
+				for s := range samples {
+					log.Printf("perf sample: %d frames", len(s.IPs))
+				}
+			}()
+		}
+	}
 
 	sockPath := "/var/run/nebula.sock"
-	err := os.Remove(sockPath)
-	if err != nil {
-		return
-	} // au cas où
+	os.MkdirAll("/var/run", 0755)
+
+	if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
+		log.Printf("Error removing old socket: %v", err)
+	}
 
 	addr := net.UnixAddr{Name: sockPath, Net: "unixgram"}
-	conn, err := net.ListenUnixgram("unixgram", &addr)
-	if err != nil {
-		log.Fatalf("Error listening on unix socket: %v", err)
-	}
-	defer func(conn *net.UnixConn) {
-		err := conn.Close()
+
+	var conn *net.UnixConn
+	for {
+		c, err := net.ListenUnixgram("unixgram", &addr)
 		if err != nil {
-
+			log.Printf("Error listening on unix socket: %v", err)
+			time.Sleep(2 * time.Second)
+			continue
 		}
-	}(conn)
+		conn = c
+		break
+	}
+	defer conn.Close()
 
-	// Permissions correctes pour PHP-FPM
 	uid, gid := detectPHPUser()
-	err = os.Chown(sockPath, uid, gid)
-	if err != nil {
-		return
-	}
-	err = os.Chmod(sockPath, 0660)
-	if err != nil {
-		return
-	}
+	_ = os.Chown(sockPath, uid, gid)
+	_ = os.Chmod(sockPath, 0660)
 
 	log.Printf("Nebula Agent listening on %s", sockPath)
 
-	go agent.CleanupSessions()
+	go internal.ExportSessionsLoop()
+	go internal.CleanupSessions()
 
-	go func() {
-		for range time.Tick(2 * time.Second) {
-			var activeSessions []*agent.Session
-			for i := 0; i < agent.NumShards; i++ {
-				shard := agent.SessionShards[i]
-				shard.Mu.RLock()
-				for _, s := range shard.Sessions {
-					activeSessions = append(activeSessions, s)
-				}
-				shard.Mu.RUnlock()
-			}
+	eventChan := make(chan internal.Packet, 10000)
+	internal.StartWorkers(*workers, eventChan)
 
-			for _, s := range activeSessions {
-				s.Print()
-			}
-		}
-	}()
-
-	eventChan := make(chan agent.Packet, 10000)
-	agent.StartWorkers(*workers, eventChan)
-
-	agent.ListenUnixgram(conn, eventChan)
+	internal.ListenUnixgram(conn, eventChan)
 }
 
 func detectPHPUser() (int, int) {

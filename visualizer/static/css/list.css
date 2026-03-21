@@ -1,0 +1,59 @@
+:root {
+    --primary: #2563eb;
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text: #1e293b;
+}
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+}
+.container {
+    max-width: 800px;
+    width: 100%;
+}
+header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+h1 {
+    font-size: 2.5rem;
+    color: var(--primary);
+    margin-bottom: 10px;
+}
+.info { color: #64748b; font-size: 0.9rem; }
+.file-list {
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    overflow: hidden;
+}
+.file-item {
+    display: flex;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    text-decoration: none;
+    color: var(--text);
+    transition: background-color 0.2s;
+}
+.file-item:last-child { border-bottom: none; }
+.file-item:hover {
+    background-color: #f1f5f9;
+}
+.file-icon {
+    margin-right: 16px;
+    color: var(--primary);
+}
+.file-name { font-weight: 500; flex-grow: 1; }
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #64748b;
+}

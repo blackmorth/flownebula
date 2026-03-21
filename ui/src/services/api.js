@@ -1,0 +1,27 @@
+const API_URL = import.meta.env.VITE_API_URL || "http://server:8080";
+
+export async function api(method, endpoint, data = null, token = null) {
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(API_URL + endpoint, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+    });
+
+    let json = {};
+    try {
+        json = await res.json();
+    } catch (e) {
+        // fallback si le serveur ne renvoie pas de JSON
+        json = {};
+    }
+
+    // Si status >= 400, on renvoie quand même l'objet pour le front
+    if (!res.ok) {
+        return json; // ex: { error: "invalid credentials" }
+    }
+
+    return json;
+}

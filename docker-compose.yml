@@ -1,0 +1,43 @@
+services:
+  agent:
+    build:
+      context: ./agent
+      dockerfile: ../docker/Dockerfile.agent
+    volumes:
+      - nebula-sock:/var/run
+      - nebula-bin:/opt/nebula
+    restart: always
+
+  php:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.php
+    volumes:
+      - nebula-sock:/var/run
+      - nebula-bin:/opt/nebula
+    depends_on:
+      - agent
+    pid: "service:agent"
+    restart: always
+
+  server:
+    build:
+      context: ./server
+      dockerfile: ../docker/Dockerfile.server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./server/nebula.db:/app/nebula.db
+    restart: unless-stopped
+  ui:
+    build:
+      context: ./ui
+      dockerfile: ../docker/Dockerfile.ui
+    ports:
+      - "8081:80"
+    #depends_on:
+     # - server
+
+volumes:
+  nebula-sock:
+  nebula-bin:
