@@ -26,8 +26,7 @@ services:
       dockerfile: ../docker/Dockerfile.server
     ports:
       - "8080:8080"
-    volumes:
-      - ./server/nebula.db:/app/nebula.db
+
     restart: unless-stopped
   ui:
     build:
@@ -41,3 +40,4 @@ services:
 volumes:
   nebula-sock:
   nebula-bin:
+  local-db:

@@ -27,6 +27,7 @@ func RegisterRoutes(app *fiber.App, repo UserRepository) {
 	g.Post("/register", h.Register)
 	g.Post("/login", h.Login)
 	g.Get("/validate", h.Validate)
+	g.Get("/me", h.Me)
 }
 
 type registerRequest struct {
@@ -130,6 +131,23 @@ func (h *Handler) Validate(c *fiber.Ctx) error {
 		"email":   claims.Email,
 		"exp":     claims.ExpiresAt,
 	})
+}
+
+func (h *Handler) Me(c *fiber.Ctx) error {
+    userID := c.Locals("user_id").(int64)
+
+    user, err := h.repo.FindByID(userID)
+    if err != nil {
+        return c.Status(404).JSON(fiber.Map{"error": "user not found"})
+    }
+
+    return c.JSON(fiber.Map{
+        "id":            user.ID,
+        "email":         user.Email,
+        "roles":         user.Roles,
+        "agent_token":   user.AgentToken,
+        "agent_enabled": user.AgentEnabled,
+    })
 }
 
 func (h *Handler) ListUsers(c *fiber.Ctx) error {
