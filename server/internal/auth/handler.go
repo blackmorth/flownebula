@@ -1,33 +1,40 @@
 package auth
 
 import (
-    "encoding/hex"
-    "math/rand"
-    "strconv"
-    "time"
-    "strings"
+	"encoding/hex"
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
 
-    "github.com/gofiber/fiber/v2"
-    "golang.org/x/crypto/bcrypt"
+	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 )
-
 
 type Handler struct {
 	repo UserRepository
 }
 
 func NewHandler(repo UserRepository) *Handler {
-    return &Handler{repo: repo}
+	return &Handler{repo: repo}
 }
 
 func RegisterRoutes(app *fiber.App, repo UserRepository) {
 	h := &Handler{repo: repo}
 
 	g := app.Group("/auth")
+
+	// Routes publiques
 	g.Post("/register", h.Register)
 	g.Post("/login", h.Login)
-	g.Get("/validate", h.Validate)
-	g.Get("/me", h.Me)
+	g.Post("/agent-login", h.AgentLogin)
+}
+
+func RegisterProctectedRoutes(app fiber.Router, repo UserRepository) {
+	h := &Handler{repo: repo}
+	// Routes protégées
+	app.Get("/validate", h.Validate)
+	app.Get("/me", h.Me)
 }
 
 type registerRequest struct {
@@ -55,9 +62,14 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to hash password"})
 	}
 
+	tokenBytes := make([]byte, 32)
+	rand.Read(tokenBytes)
+
 	user := &User{
-		Email:    req.Email,
-		Password: string(hash),
+		Email:      req.Email,
+		Password:   string(hash),
+		AgentToken: "nebula_" + hex.EncodeToString(tokenBytes),
+		Roles:      []string{"ROLE_USER"},
 	}
 
 	if err := h.repo.Create(user); err != nil {
@@ -107,6 +119,31 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	})
 }
 
+func (h *Handler) AgentLogin(c *fiber.Ctx) error {
+	var req struct {
+		AgentToken string `json:"agent_token"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
+	}
+
+	if req.AgentToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "agent_token required"})
+	}
+
+	user, err := h.repo.FindByAgentToken(req.AgentToken)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid agent token"})
+	}
+
+	token, err := GenerateToken(user, 24*time.Hour)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate token"})
+	}
+
+	return c.JSON(fiber.Map{"token": token})
+}
+
 func (h *Handler) Validate(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
@@ -134,66 +171,78 @@ func (h *Handler) Validate(c *fiber.Ctx) error {
 }
 
 func (h *Handler) Me(c *fiber.Ctx) error {
-    userID := c.Locals("user_id").(int64)
+	// Vérifier que user_id existe
+	userIDRaw := c.Locals("user_id")
+	if userIDRaw == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
-    user, err := h.repo.FindByID(userID)
-    if err != nil {
-        return c.Status(404).JSON(fiber.Map{"error": "user not found"})
-    }
+	userID, ok := userIDRaw.(int64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user_id type",
+		})
+	}
 
-    return c.JSON(fiber.Map{
-        "id":            user.ID,
-        "email":         user.Email,
-        "roles":         user.Roles,
-        "agent_token":   user.AgentToken,
-        "agent_enabled": user.AgentEnabled,
-    })
+	user, err := h.repo.FindByID(userID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "user not found"})
+	}
+
+	return c.JSON(fiber.Map{
+		"id":            user.ID,
+		"email":         user.Email,
+		"roles":         user.Roles,
+		"agent_token":   user.AgentToken,
+		"agent_enabled": user.AgentEnabled,
+	})
 }
 
 func (h *Handler) ListUsers(c *fiber.Ctx) error {
-    users, err := h.repo.FindAll()
-    if err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "failed to list users"})
-    }
-    return c.JSON(users)
+	users, err := h.repo.FindAll()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to list users"})
+	}
+	return c.JSON(users)
 }
 
 func (h *Handler) EnableAgent(c *fiber.Ctx) error {
-    id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
-    if err := h.repo.UpdateAgentEnabled(id, true); err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "failed to enable agent"})
-    }
-    return c.JSON(fiber.Map{"status": "enabled"})
+	id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err := h.repo.UpdateAgentEnabled(id, true); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to enable agent"})
+	}
+	return c.JSON(fiber.Map{"status": "enabled"})
 }
 
 func (h *Handler) DisableAgent(c *fiber.Ctx) error {
-    id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
-    if err := h.repo.UpdateAgentEnabled(id, false); err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "failed to disable agent"})
-    }
-    return c.JSON(fiber.Map{"status": "disabled"})
+	id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err := h.repo.UpdateAgentEnabled(id, false); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to disable agent"})
+	}
+	return c.JSON(fiber.Map{"status": "disabled"})
 }
 
 func (h *Handler) RegenerateAgentToken(c *fiber.Ctx) error {
-    id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
+	id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
 
-    tokenBytes := make([]byte, 32)
-    rand.Read(tokenBytes)
-    newToken := "nebula_" + hex.EncodeToString(tokenBytes)
+	tokenBytes := make([]byte, 32)
+	rand.Read(tokenBytes)
+	newToken := "nebula_" + hex.EncodeToString(tokenBytes)
 
-    if err := h.repo.UpdateAgentToken(id, newToken); err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "failed to regenerate token"})
-    }
+	if err := h.repo.UpdateAgentToken(id, newToken); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to regenerate token"})
+	}
 
-    return c.JSON(fiber.Map{"agent_token": newToken})
+	return c.JSON(fiber.Map{"agent_token": newToken})
 }
 
 func RegisterAdminRoutes(router fiber.Router, repo UserRepository) {
-    h := NewHandler(repo)
+	h := NewHandler(repo)
 
-    router.Get("/users", h.ListUsers)
-    router.Post("/users/:id/agent/enable", h.EnableAgent)
-    router.Post("/users/:id/agent/disable", h.DisableAgent)
-    router.Post("/users/:id/agent/regenerate", h.RegenerateAgentToken)
+	router.Get("/users", h.ListUsers)
+	router.Post("/users/:id/agent/enable", h.EnableAgent)
+	router.Post("/users/:id/agent/disable", h.DisableAgent)
+	router.Post("/users/:id/agent/regenerate", h.RegenerateAgentToken)
 }
-

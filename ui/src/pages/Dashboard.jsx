@@ -1,61 +1,30 @@
+import DashboardView from "../views/DashboardView";
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
-import Layout from "../components/Layout";
-import {
-    Box,
-    Heading,
-    Text,
-    Badge,
-    Table,
-} from "@chakra-ui/react";
 
 export default function Dashboard() {
+    const [loading, setLoading] = useState(true);
     const [sessions, setSessions] = useState([]);
+    const [user, setUser] = useState(null);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        api("GET", "/sessions", null, token).then(res => {
-            setSessions(res || []);
+
+        Promise.all([
+            api("GET", "/auth/me", null, token),
+            api("GET", "/sessions", null, token)
+        ]).then(([me, sess]) => {
+            setUser(me?.error ? null : me);
+            setSessions(Array.isArray(sess) ? sess : []);
+            setLoading(false);
         });
     }, []);
 
     return (
-        <Layout>
-            <Heading mb={6} color="primary">
-                Nebula Dashboard
-            </Heading>
-
-            {sessions.length === 0 && (
-                <Text fontSize="lg" color="fg.muted">
-                    Aucune session pour le moment.
-                </Text>
-            )}
-
-            {sessions.length > 0 && (
-                <Table.Root bg="bg.subtle" p={6} rounded="md" shadow="lg">
-                    <Table variant="simple">
-                        <Table.Header>
-                            <Table.Row>
-                                <Table.ColumnHeader>ID</Table.ColumnHeader>
-                                <Table.ColumnHeader>Agent</Table.ColumnHeader>
-                                <Table.ColumnHeader>Date</Table.ColumnHeader>
-                            </Table.Row>
-                        </Table.Header>
-
-                        <Table.Body>
-                            {sessions.map(s => (
-                                <Table.Row key={s.id}>
-                                    <Table.Cell>
-                                        <Badge colorScheme="purple">{s.id}</Badge>
-                                    </Table.Cell>
-                                    <Table.Cell>{s.agent_id}</Table.Cell>
-                                    <Table.Cell>{new Date(s.created_at).toLocaleString()}</Table.Cell>
-                                </Table.Row>
-                            ))}
-                        </Table.Body>
-                    </Table>
-                </Table.Root>
-            )}
-        </Layout>
+        <DashboardView
+            loading={loading}
+            user={user}
+            sessions={sessions}
+        />
     );
 }

@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://server:8080";
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 export async function api(method, endpoint, data = null, token = null) {
     const headers = { "Content-Type": "application/json" };

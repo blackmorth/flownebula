@@ -51,8 +51,13 @@ func Migrate(db *sql.DB) {
 		FOREIGN KEY(session_id) REFERENCES sessions(id)
 	);`
 
-
-
+	sessionProfileTable := `
+	CREATE TABLE IF NOT EXISTS session_profiles (
+		session_id INTEGER PRIMARY KEY,
+		payload TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (session_id) REFERENCES sessions(id)
+	);`
 
 	if _, err := db.Exec(userTable); err != nil {
 		log.Fatalf("failed to migrate users table: %v", err)
@@ -64,5 +69,9 @@ func Migrate(db *sql.DB) {
 
 	if _, err := db.Exec(metricTable); err != nil {
 		log.Fatalf("failed to migrate metrics table: %v", err)
+	}
+
+	if _, err := db.Exec(sessionProfileTable); err != nil {
+		log.Fatalf("failed to migrate session_profiles table: %v", err)
 	}
 }

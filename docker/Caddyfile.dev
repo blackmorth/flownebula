@@ -1,0 +1,10 @@
+:80
+
+# API
+@api path /api/*
+reverse_proxy @api server:8080
+
+# UI (Vite)
+reverse_proxy ui:5173 {
+    header_up Host {host}
+}

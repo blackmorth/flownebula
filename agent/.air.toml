@@ -1,0 +1,6 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/agent ./cmd/nebula-agent"
+entrypoint = "./tmp/agent"

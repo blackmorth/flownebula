@@ -18,10 +18,12 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Printf("Starting Nebula Agent...")
 	var (
-		daemon    = flag.Bool("daemon", false, "Run as daemon (background process)")
-		logFile   = flag.String("log", "", "Path to log file")
-		workers   = flag.Int("workers", 4, "Number of worker goroutines for event processing")
-		samplePID = flag.Int("sample-pid", 0, "PID to CPU-sample with perf_event_open")
+		daemon     = flag.Bool("daemon", false, "Run as daemon (background process)")
+		logFile    = flag.String("log", "", "Path to log file")
+		workers    = flag.Int("workers", 4, "Number of worker goroutines for event processing")
+		samplePID  = flag.Int("sample-pid", 0, "PID to CPU-sample with perf_event_open")
+		serverURL  = flag.String("server-url", "", "Nebula server URL (e.g. http://localhost:8080)")
+		agentToken = flag.String("agent-token", "", "Agent token for server authentication")
 	)
 	flag.Parse()
 
@@ -109,6 +111,16 @@ func main() {
 	_ = os.Chmod(sockPath, 0660)
 
 	log.Printf("Nebula Agent listening on %s", sockPath)
+
+	if *serverURL != "" && *agentToken != "" {
+		sender, err := internal.NewSender(*serverURL, *agentToken)
+		if err != nil {
+			log.Printf("Warning: failed to connect to server: %v", err)
+		} else {
+			internal.GlobalSender = sender
+			log.Printf("Connected to server: %s", *serverURL)
+		}
+	}
 
 	go internal.ExportSessionsLoop()
 	go internal.CleanupSessions()

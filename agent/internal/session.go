@@ -146,13 +146,23 @@ func (s *Session) Print() {
 	log.Printf("\n=== Session %016x ===\n", s.ID)
 
 	jsonData, err := s.ExportToDetailedJSON()
-	if err == nil {
-		filename := fmt.Sprintf("session_%016x.json", s.ID)
-		_ = os.WriteFile(filename, jsonData, 0644)
-		_ = os.WriteFile("session.json", jsonData, 0644)
-		log.Printf("Exported session %016x to %s", s.ID, filename)
-	} else {
+	if err != nil {
 		log.Printf("Failed to export session %016x: %v", s.ID, err)
+		return
+	}
+
+	filename := fmt.Sprintf("session_%016x.json", s.ID)
+	_ = os.WriteFile(filename, jsonData, 0644)
+	_ = os.WriteFile("session.json", jsonData, 0644)
+	log.Printf("Exported session %016x to %s", s.ID, filename)
+
+	if GlobalSender != nil {
+		agentID := fmt.Sprintf("%016x", s.ID)
+		if err := GlobalSender.SendProfile(agentID, jsonData); err != nil {
+			log.Printf("Failed to send session %016x to server: %v", s.ID, err)
+		} else {
+			log.Printf("Session %016x sent to server", s.ID)
+		}
 	}
 }
 

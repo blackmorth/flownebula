@@ -1,26 +1,23 @@
 import {
-    Box,
     Flex,
+    Box,
     VStack,
+    HStack,
     Text,
     Link,
     Button,
-    HStack,
     Image,
 } from "@chakra-ui/react";
 import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/nebula-logo.svg";
 
-export default function Layout({ children }) {
+export default function AdminLayout({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
 
     const logout = () => {
-        // 1. Supprime le token
         localStorage.removeItem("token");
-
-        // 2. Redirige vers la page d'accueil
-        navigate("/", { replace: true }); // replace pour ne pas pouvoir revenir en arrière
+        navigate("/", { replace: true });
     };
 
     const NavItem = ({ to, label }) => {
@@ -30,7 +27,6 @@ export default function Layout({ children }) {
             <Link
                 as={RouterLink}
                 to={to}
-                w="full"
                 px={3}
                 py={2}
                 rounded="md"
@@ -50,7 +46,7 @@ export default function Layout({ children }) {
 
     return (
         <Flex minH="100vh" bg="bg" color="text">
-            {/* 🌌 Sidebar */}
+            {/* Sidebar Admin */}
             <Flex
                 w="260px"
                 direction="column"
@@ -63,15 +59,27 @@ export default function Layout({ children }) {
                 <VStack align="stretch" spacing={6}>
                     {/* Logo */}
                     <HStack px={2}>
-                        <Image src={logo} alt="Flow Nebula" />
+                        <Image src={logo} alt="Flow Nebula Admin" />
                     </HStack>
 
-                    {/* Nav */}
-
+                    {/* Admin Navigation */}
                     <VStack align="stretch" spacing={1}>
-                        <NavItem to="/dashboard" label="Dashboard" />
-                        <NavItem to="/sessions" label="Sessions" />
-                        <NavItem to="/settings" label="Settings" />
+                        <Text
+                            fontSize="xs"
+                            textTransform="uppercase"
+                            color="text.muted"
+                            px={2}
+                            mb={1}
+                        >
+                            Administration
+                        </Text>
+                        <NavItem to="/dashboard" label="User Mode" />
+                        <NavItem to="/admin/users" label="Users" />
+                        <NavItem to="/admin/agents" label="Agents" />
+                        <NavItem to="/admin/sessions" label="Sessions" />
+                        <NavItem to="/admin/metrics" label="Metrics" />
+                        <NavItem to="/admin/logs" label="Logs" />
+                        <NavItem to="/admin/settings" label="Settings" />
                     </VStack>
                 </VStack>
 
@@ -90,7 +98,7 @@ export default function Layout({ children }) {
                 </Button>
             </Flex>
 
-            {/* 📊 Main */}
+            {/* Main Admin Content */}
             <Flex direction="column" flex="1">
                 {/* Header */}
                 <Flex
@@ -102,29 +110,13 @@ export default function Layout({ children }) {
                     borderColor="border"
                     bg="bg.subtle"
                 >
-                    {/* Left */}
                     <Text fontSize="sm" color="text.muted">
-                        Monitoring & Profiling Platform
+                        Flow Nebula — Admin Console
                     </Text>
-
-                    {/* Right */}
-                    {/*<HStack spacing={3}>
-                        <Box
-                            w="8px"
-                            h="8px"
-                            bg="perf.low"
-                            rounded="full"
-                        />
-                        <Text fontSize="xs" color="text.muted">
-                            Server OK
-                        </Text>
-                    </HStack>*/}
                 </Flex>
 
                 {/* Content */}
-                <Box p={8}>
-                    {children}
-                </Box>
+                <Box p={8}>{children}</Box>
             </Flex>
         </Flex>
     );
