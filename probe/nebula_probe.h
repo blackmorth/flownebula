@@ -4,16 +4,12 @@
 #include "php.h"
 #include "zend_API.h"
 #include "zend_extensions.h"
-#include "zend_exceptions.h"
 #include "zend_compile.h"
 #include <stdint.h>
 #include <stdatomic.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/un.h>     // ← obligatoire pour sockaddr_un
+#include <sys/un.h>
 #include <time.h>
 #include "nebula_protocol.h"
-
 
 #define NEBULA_STACK_SIZE 256
 #define NEBULA_RING_SIZE  65536
@@ -34,14 +30,11 @@ typedef struct frame_t {
 ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     zend_bool enabled;
     uint64_t  threshold_ns;
-    char     *agent_host;
-    long      agent_port;
     int       depth;
     frame_t   stack[NEBULA_STACK_SIZE];
     nebula_event_t       buffer[NEBULA_RING_SIZE];
     atomic_uint_fast32_t write_pos;
-    int                  udp_fd;
-    struct sockaddr_in   agent_addr;
+    int                  socket_fd;
     struct sockaddr_un   agent_addr_un;
     uint32_t             next_func_id;
     HashTable            func_map;

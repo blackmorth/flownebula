@@ -1,7 +1,8 @@
 #include "nebula_probe.h"
-#include <sys/resource.h>
+#include <string.h>
+#include <stdlib.h>
 #include <sys/time.h>
-#include <sys/socket.h>
+#include <unistd.h>
 
 void generate_session_id(char out[SESSION_ID_SIZE])
 {
@@ -15,7 +16,7 @@ void generate_session_id(char out[SESSION_ID_SIZE])
 
 void send_func_name(uint32_t func_id, const char *name)
 {
-    if (!name || NEBULA_G(udp_fd) <= 0) return;
+    if (!name || NEBULA_G(socket_fd) <= 0) return;
     size_t name_len = strlen(name);
     if (name_len > 255) name_len = 255;
     nebula_name_t pkg;
@@ -24,7 +25,7 @@ void send_func_name(uint32_t func_id, const char *name)
     pkg.func_id    = func_id;
     pkg.name_len   = (uint32_t)name_len;
     memcpy(pkg.name, name, name_len);
-    sendto(NEBULA_G(udp_fd), &pkg, 17 + name_len, MSG_DONTWAIT,
+    sendto(NEBULA_G(socket_fd), &pkg, 17 + name_len, MSG_DONTWAIT,
            (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
 }
 
@@ -49,53 +50,14 @@ uint32_t get_func_id(const zend_function *func)
     send_func_name(id, tmp);
     return id;
 }
-static inline uint64_t get_cpu_time_thread(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-}
 
-uint64_t get_io_wait(void)
-{
-    FILE *f = fopen("/proc/self/io", "r");
-    if (!f) return 0;
-    char line[256];
-    uint64_t read_bytes = 0, write_bytes = 0;
-    while (fgets(line, sizeof(line), f)) {
-        if (strncmp(line, "read_bytes:", 11) == 0) {
-            read_bytes = strtoull(line + 11, NULL, 10);
-        } else if (strncmp(line, "write_bytes:", 12) == 0) {
-            write_bytes = strtoull(line + 12, NULL, 10);
-        }
-    }
-    fclose(f);
-    return read_bytes + write_bytes;
-}
+// --- fonctions neutres mais présentes pour compatibilité ---
+uint64_t get_cpu_time(void) { return 0; }
+uint64_t get_io_wait(void) { return 0; }
+uint64_t get_nw_usage(void) { return 0; }
 
-uint64_t get_nw_usage(void)
-{
-    FILE *f = fopen("/proc/self/net/dev", "r");
-    if (!f) return 0;
-    char line[512];
-    uint64_t total = 0;
-    // Skip first 2 lines
-    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; }
-    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; }
-    while (fgets(line, sizeof(line), f)) {
-        char iface[32];
-        uint64_t rb, tb, r1, r2, r3, r4, r5, r6, t1, t2, t3, t4, t5, t6;
-        if (sscanf(line, " %[^:]: %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
-                   iface, &rb, &r1, &r2, &r3, &r4, &r5, &r6, &r1, &tb, &t1, &t2, &t3, &t4, &t5, &t6, &t1) >= 10) {
-            if (strcmp(iface, "lo") != 0) {
-                total += rb + tb;
-            }
-        }
-    }
-    fclose(f);
-    return total;
-}
-
-void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive, uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network)
+void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive,
+               uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network)
 {
     if (!func_id && event_type == 1) return;
     uint32_t pos = atomic_fetch_add(&NEBULA_G(write_pos), 1);
@@ -117,7 +79,7 @@ void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_
 void flush_buffer(void)
 {
     uint32_t n = atomic_load(&NEBULA_G(write_pos));
-    if (n == 0 || NEBULA_G(udp_fd) <= 0) {
+    if (n == 0 || NEBULA_G(socket_fd) <= 0) {
         atomic_store(&NEBULA_G(write_pos), 0);
         return;
     }
@@ -126,7 +88,7 @@ void flush_buffer(void)
     while (sent < n) {
         uint32_t to_send = n - sent;
         if (to_send > NEBULA_BATCH_SIZE) to_send = NEBULA_BATCH_SIZE;
-        ssize_t res = sendto(NEBULA_G(udp_fd), &NEBULA_G(buffer)[sent], to_send * sizeof(nebula_event_t),
+        ssize_t res = sendto(NEBULA_G(socket_fd), &NEBULA_G(buffer)[sent], to_send * sizeof(nebula_event_t),
                              MSG_DONTWAIT, (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
         if (res < 0) break;
         sent += to_send;

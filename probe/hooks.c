@@ -1,5 +1,3 @@
-// hooks.c (version low-overhead)
-
 #include "nebula_probe.h"
 #include <time.h>
 
@@ -50,10 +48,8 @@ void nebula_execute_ex(zend_execute_data *execute_data)
 
     uint64_t inclusive = end_time - f->start_time;
     uint64_t exclusive = inclusive - f->child_time;
-
     uint64_t cpu_total = cpu_end - f->cpu_start;
     uint64_t cpu_excl  = cpu_total - f->cpu_child_time;
-
     int64_t  mem_delta = (int64_t)end_mem - (int64_t)f->start_mem;
 
     if (NEBULA_G(depth) > 0) {
@@ -68,7 +64,8 @@ void nebula_execute_ex(zend_execute_data *execute_data)
 
 void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value)
 {
-    if (UNEXPECTED(!NEBULA_G(enabled) || !execute_data->func)) {
+    // FIX SEGFAULT: execute_data ou func NULL
+    if (!execute_data || !execute_data->func || !NEBULA_G(enabled)) {
         if (old_execute_internal) old_execute_internal(execute_data, return_value);
         else execute_internal(execute_data, return_value);
         return;
@@ -105,10 +102,8 @@ void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value
 
     uint64_t inclusive = end_time - f->start_time;
     uint64_t exclusive = inclusive - f->child_time;
-
     uint64_t cpu_total = cpu_end - f->cpu_start;
     uint64_t cpu_excl  = cpu_total - f->cpu_child_time;
-
     int64_t  mem_delta = (int64_t)end_mem - (int64_t)f->start_mem;
 
     if (NEBULA_G(depth) > 0) {

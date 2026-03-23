@@ -1,5 +1,10 @@
 #include "nebula_probe.h"
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <stdatomic.h>
 
 ZEND_DECLARE_MODULE_GLOBALS(nebula_probe)
 
@@ -13,30 +18,21 @@ PHP_INI_BEGIN()
                       enabled, zend_nebula_probe_globals, nebula_probe_globals)
     STD_PHP_INI_ENTRY("nebula_probe.threshold_ns", "0",    PHP_INI_ALL, OnUpdateLong,
                       threshold_ns, zend_nebula_probe_globals, nebula_probe_globals)
-    STD_PHP_INI_ENTRY("nebula_probe.agent_host",   "127.0.0.1", PHP_INI_SYSTEM, OnUpdateString,
-                      agent_host, zend_nebula_probe_globals, nebula_probe_globals)
-    STD_PHP_INI_ENTRY("nebula_probe.agent_port",   "8135", PHP_INI_SYSTEM, OnUpdateLong,
-                      agent_port, zend_nebula_probe_globals, nebula_probe_globals)
 PHP_INI_END()
 
 PHP_MINIT_FUNCTION(nebula_probe)
 {
     REGISTER_INI_ENTRIES();
-    #include <sys/un.h>
 
-    NEBULA_G(udp_fd) = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (NEBULA_G(udp_fd) > 0) {
+    // Socket UNIX
+    NEBULA_G(socket_fd) = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (NEBULA_G(socket_fd) > 0) {
         struct sockaddr_un *addr = &NEBULA_G(agent_addr_un);
         memset(addr, 0, sizeof(*addr));
         addr->sun_family = AF_UNIX;
         strncpy(addr->sun_path, "/var/run/nebula.sock", sizeof(addr->sun_path)-1);
     }
-    if (NEBULA_G(udp_fd) > 0) {
-        memset(&NEBULA_G(agent_addr), 0, sizeof(NEBULA_G(agent_addr)));
-        NEBULA_G(agent_addr).sin_family = AF_INET;
-        NEBULA_G(agent_addr).sin_port = htons(NEBULA_G(agent_port));
-        inet_pton(AF_INET, NEBULA_G(agent_host), &NEBULA_G(agent_addr).sin_addr);
-    }
+
     zend_hash_init(&NEBULA_G(func_map), 1024, NULL, NULL, 1);
     NEBULA_G(next_func_id) = 1;
     atomic_store(&NEBULA_G(write_pos), 0);
@@ -44,15 +40,20 @@ PHP_MINIT_FUNCTION(nebula_probe)
     zend_execute_ex = nebula_execute_ex;
     old_execute_internal = zend_execute_internal;
     zend_execute_internal = nebula_execute_internal;
-    NEBULA_G(session_id_ptr) = malloc(SESSION_ID_SIZE);
+
+    // FIX SEGFAULT: calloc pour éviter lecture aléatoire
+    if (!NEBULA_G(session_id_ptr)) {
+        NEBULA_G(session_id_ptr) = calloc(1, SESSION_ID_SIZE);
+    }
+
     return SUCCESS;
 }
 
 PHP_MSHUTDOWN_FUNCTION(nebula_probe)
 {
     UNREGISTER_INI_ENTRIES();
-    if (NEBULA_G(udp_fd) > 0) {
-        close(NEBULA_G(udp_fd));
+    if (NEBULA_G(socket_fd) > 0) {
+        close(NEBULA_G(socket_fd));
     }
     zend_hash_destroy(&NEBULA_G(func_map));
     zend_execute_ex = old_execute_ex;

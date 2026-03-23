@@ -22,8 +22,7 @@ RUN make && make install
 
 # Charger l’extension
 RUN echo "extension=nebula_probe.so" > /usr/local/etc/php/conf.d/nebula.ini \
-    && echo "nebula_probe.enabled=1" >> /usr/local/etc/php/conf.d/nebula.ini \
-    && echo "nebula_probe.agent_host=/var/run/nebula.sock" >> /usr/local/etc/php/conf.d/nebula.ini
+    && echo "nebula_probe.enabled=1" >> /usr/local/etc/php/conf.d/nebula.ini
 
 WORKDIR /var/www/html
 
