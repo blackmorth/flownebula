@@ -9,7 +9,7 @@ import (
 
 func GetFuncName(id uint32) string {
 	if id == 0 {
-		return "main()"
+		return "{invalid}"
 	}
 	FuncNamesMu.RLock()
 	defer FuncNamesMu.RUnlock()
@@ -54,7 +54,7 @@ func GetSession(id uint64) *Session {
 
 	s = &Session{
 		ID:       id,
-		Root:     NewNode(0, 0),
+		Root:     NewNode(0, 1),
 		stack:    []*Node{},
 		LastSeen: time.Now(),
 	}
@@ -125,6 +125,7 @@ func (s *Session) AddEvent(ev CallEvent) {
 		}
 
 		_ = s.Pop()
+		node.Metrics["ct"]++
 		node.Metrics["wt"] += int64(ev.Inclusive)
 		node.Metrics["ewt"] += int64(ev.Exclusive)
 		node.Metrics["cpu"] += int64(ev.CPUTime)
@@ -157,9 +158,8 @@ func (s *Session) Print() {
 	log.Printf("Exported session %016x to %s", s.ID, filename)
 
 	if GlobalSender != nil {
-		agentID := fmt.Sprintf("%016x", s.ID)
-		if err := GlobalSender.SendProfile(agentID, jsonData); err != nil {
-			log.Printf("Failed to send session %016x to server: %v", s.ID, err)
+		if err := GlobalSender.SendSession(jsonData); err != nil {
+			log.Printf("Failed to send session %016x: %v", s.ID, err)
 		} else {
 			log.Printf("Session %016x sent to server", s.ID)
 		}

@@ -34,7 +34,7 @@ PHP_MINIT_FUNCTION(nebula_probe)
     }
 
     zend_hash_init(&NEBULA_G(func_map), 1024, NULL, NULL, 1);
-    NEBULA_G(next_func_id) = 1;
+    NEBULA_G(next_func_id) = 2; /* 0 = root synthétique agent, 1 = entrée requête réservé */
     atomic_store(&NEBULA_G(write_pos), 0);
     old_execute_ex = zend_execute_ex;
     zend_execute_ex = nebula_execute_ex;
@@ -70,11 +70,31 @@ PHP_RINIT_FUNCTION(nebula_probe)
     NEBULA_G(depth) = 0;
     atomic_store(&NEBULA_G(write_pos), 0);
     generate_session_id(NEBULA_G(session_id_ptr));
+
+    /* Point d'entrée réel : func_id=1 réservé pour toute la requête */
+    const char *script = SG(request_info).path_translated;
+    const char *entry_name;
+
+    if (script && script[0]) {
+        const char *sep = strrchr(script, '/');
+        entry_name = sep ? sep + 1 : script;
+    } else {
+        entry_name = "{request}";
+    }
+
+    send_func_name(1, entry_name);
+    NEBULA_G(request_start) = zend_hrtime_nebula();
+    emit_call(0, 1, 0, 0, 0, 0, 0, 0, 0); /* ENTER func_id=1 */
+
     return SUCCESS;
 }
 
 PHP_RSHUTDOWN_FUNCTION(nebula_probe)
 {
+    /* Fermeture du point d'entrée func_id=1 avec le temps total de la requête */
+    uint64_t elapsed = zend_hrtime_nebula() - NEBULA_G(request_start);
+    emit_call(1, 1, elapsed, elapsed, 0, 0, 0, 0, 0); /* EXIT func_id=1 */
+
     nebula_send_session_end((unsigned char *) NEBULA_G(session_id_ptr));
     flush_buffer();
     return SUCCESS;

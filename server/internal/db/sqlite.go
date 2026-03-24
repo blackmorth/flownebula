@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"log"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -32,32 +33,13 @@ func Migrate(db *sql.DB) {
 
 	sessionTable := `
     CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        agent_id TEXT NOT NULL,
-        created_at DATETIME NOT NULL,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-    );`
-
-	metricTable := `
-	CREATE TABLE IF NOT EXISTS metrics (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		session_id INTEGER NOT NULL,
-		cpu_usage REAL NOT NULL,
-		ram_usage REAL NOT NULL,
-		load_avg REAL NOT NULL,
-		process_count INTEGER NOT NULL,
-		created_at DATETIME NOT NULL,
-		FOREIGN KEY(session_id) REFERENCES sessions(id)
-	);`
-
-	sessionProfileTable := `
-	CREATE TABLE IF NOT EXISTS session_profiles (
-		session_id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL,
+		agent_id TEXT,
+		agent_session_id TEXT,
 		payload TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (session_id) REFERENCES sessions(id)
-	);`
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`
 
 	if _, err := db.Exec(userTable); err != nil {
 		log.Fatalf("failed to migrate users table: %v", err)
@@ -65,13 +47,5 @@ func Migrate(db *sql.DB) {
 
 	if _, err := db.Exec(sessionTable); err != nil {
 		log.Fatalf("failed to migrate sessions table: %v", err)
-	}
-
-	if _, err := db.Exec(metricTable); err != nil {
-		log.Fatalf("failed to migrate metrics table: %v", err)
-	}
-
-	if _, err := db.Exec(sessionProfileTable); err != nil {
-		log.Fatalf("failed to migrate session_profiles table: %v", err)
 	}
 }

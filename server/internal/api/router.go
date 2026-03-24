@@ -4,7 +4,6 @@ import (
 	"flownebula/server/internal/agentapi"
 	"flownebula/server/internal/auth"
 	"flownebula/server/internal/db"
-	"flownebula/server/internal/metrics"
 	"flownebula/server/internal/middleware"
 	"flownebula/server/internal/profiles"
 	"flownebula/server/internal/sessions"
@@ -34,7 +33,6 @@ func New() *fiber.App {
 
 	authRepo := auth.NewSQLiteRepo(sqlite)
 	sessionRepo := sessions.NewSQLiteRepo(sqlite)
-	metricsRepo := metrics.NewSQLiteRepo(sqlite)
 	profilesRepo := profiles.NewSQLiteRepo(sqlite)
 
 	auth.RegisterRoutes(app, authRepo)
@@ -56,9 +54,6 @@ func New() *fiber.App {
 	agent := app.Group("/agent", middleware.JWTProtected())
 	agentapi.RegisterRoutes(agent, sessionRepo)
 	profiles.RegisterRoutes(agent, profilesRepo)
-
-	metricsGroup := agent.Group("/metrics")
-	metrics.RegisterRoutes(metricsGroup, metricsRepo)
 
 	return app
 }

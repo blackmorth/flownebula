@@ -9,7 +9,7 @@ type Handler struct {
 func RegisterRoutes(router fiber.Router, repo Repository) {
 	h := &Handler{repo: repo}
 	router.Post("/profiles", h.Create)
-	router.Post("/session-upload", h.Create)
+
 	router.Get("/profiles/:session_id", h.Get)
 }
 

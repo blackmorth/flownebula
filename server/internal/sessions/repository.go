@@ -7,7 +7,7 @@ import (
 )
 
 type Repository interface {
-	Create(userID int64, agentID string) (*Session, error)
+	Create(session *Session) error
 	List() ([]*Session, error)
 	Get(id int64) (*Session, error)
 }
@@ -25,21 +25,17 @@ func NewInMemoryRepo() Repository {
 	}
 }
 
-func (r *inMemoryRepo) Create(userID int64, agentID string) (*Session, error) {
+func (r *inMemoryRepo) Create(session *Session) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	s := &Session{
-		ID:        r.nextID,
-		UserID:    userID,
-		AgentID:   agentID,
-		CreatedAt: time.Now(),
-	}
+	session.ID = r.nextID
+	session.CreatedAt = time.Now()
 
-	r.sessions[s.ID] = s
+	r.sessions[session.ID] = session
 	r.nextID++
 
-	return s, nil
+	return nil
 }
 
 func (r *inMemoryRepo) List() ([]*Session, error) {

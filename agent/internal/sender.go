@@ -94,3 +94,21 @@ func (s *Sender) SendProfile(agentID string, payload []byte) error {
 	}
 	return nil
 }
+
+func (s *Sender) SendSession(jsonData []byte) error {
+	req, _ := http.NewRequest("POST", s.serverURL+"/agent/session-upload", bytes.NewReader(jsonData))
+	req.Header.Set("Authorization", "Bearer "+s.jwt)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		return fmt.Errorf("server returned %d", resp.StatusCode)
+	}
+
+	return nil
+}

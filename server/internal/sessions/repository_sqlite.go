@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 type sqliteRepo struct {
@@ -14,29 +16,33 @@ func NewSQLiteRepo(db *sql.DB) Repository {
 	return &sqliteRepo{db: db}
 }
 
-func (r *sqliteRepo) Create(userID int64, agentID string) (*Session, error) {
+func (r *sqliteRepo) Create(session *Session) error {
 	now := time.Now()
+	session.CreatedAt = now
 
 	res, err := r.db.Exec(
-		"INSERT INTO sessions (user_id, agent_id, created_at) VALUES (?, ?, ?)",
-		userID, agentID, now,
+		`INSERT INTO sessions (user_id, agent_id, agent_session_id, payload, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+		session.UserID,
+		session.AgentID,
+		session.AgentSessionID,
+		string(session.Payload), // datatypes.JSON → string
+		session.CreatedAt,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	id, _ := res.LastInsertId()
-
-	return &Session{
-		ID:        id,
-		UserID:    userID,
-		AgentID:   agentID,
-		CreatedAt: now,
-	}, nil
+	session.ID = id
+	return nil
 }
 
 func (r *sqliteRepo) List() ([]*Session, error) {
-	rows, err := r.db.Query("SELECT id, user_id, agent_id, created_at FROM sessions ORDER BY id DESC")
+	rows, err := r.db.Query(
+		`SELECT id, user_id, agent_id, agent_session_id, payload, created_at
+         FROM sessions ORDER BY id DESC`,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -45,9 +51,20 @@ func (r *sqliteRepo) List() ([]*Session, error) {
 	var out []*Session
 	for rows.Next() {
 		var s Session
-		if err := rows.Scan(&s.ID, &s.UserID, &s.AgentID, &s.CreatedAt); err != nil {
+		var payloadStr string
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.UserID,
+			&s.AgentID,
+			&s.AgentSessionID,
+			&payloadStr,
+			&s.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
+
+		s.Payload = datatypes.JSON([]byte(payloadStr))
 		out = append(out, &s)
 	}
 
@@ -56,17 +73,28 @@ func (r *sqliteRepo) List() ([]*Session, error) {
 
 func (r *sqliteRepo) Get(id int64) (*Session, error) {
 	row := r.db.QueryRow(
-		"SELECT id, user_id, agent_id, created_at FROM sessions WHERE id = ?",
+		`SELECT id, user_id, agent_id, agent_session_id, payload, created_at
+         FROM sessions WHERE id = ?`,
 		id,
 	)
 
 	var s Session
-	if err := row.Scan(&s.ID, &s.UserID, &s.AgentID, &s.CreatedAt); err != nil {
+	var payloadStr string
+
+	if err := row.Scan(
+		&s.ID,
+		&s.UserID,
+		&s.AgentID,
+		&s.AgentSessionID,
+		&payloadStr,
+		&s.CreatedAt,
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("session not found")
 		}
 		return nil, err
 	}
 
+	s.Payload = datatypes.JSON([]byte(payloadStr))
 	return &s, nil
 }

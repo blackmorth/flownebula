@@ -26,14 +26,21 @@ services:
     environment:
       - GO_ENV=development
   agent:
-    image: cosmtrek/air
+    image: golang:1.26-alpine
     working_dir: /app
     volumes:
       - ./agent:/app
-    command: ["air"]
+      - nebula-sock:/var/run
+    command: [
+      "go", "run", "./cmd/nebula-agent",
+      "--server-url=http://server:8080",
+      "--agent-token=nebula_6c14a999cc40487199c94fb65d9670812eddb2b5b66c8394ab1934aa4356f9de"
+    ]
     environment:
       - GO_ENV=development
-
+    depends_on:
+      server:
+        condition: service_healthy
   php:
     build:
       context: .

@@ -2,6 +2,7 @@
 #define NEBULA_PROBE_H
 
 #include "php.h"
+#include "SAPI.h"
 #include "zend_API.h"
 #include "zend_extensions.h"
 #include "zend_compile.h"
@@ -39,6 +40,7 @@ ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     uint32_t             next_func_id;
     HashTable            func_map;
     char                *session_id_ptr;
+    uint64_t             request_start;
 ZEND_END_MODULE_GLOBALS(nebula_probe)
 
 extern zend_nebula_probe_globals nebula_probe_globals;

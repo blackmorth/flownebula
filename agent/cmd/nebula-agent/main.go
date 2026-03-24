@@ -85,7 +85,10 @@ func main() {
 	}
 
 	sockPath := "/var/run/nebula.sock"
-	os.MkdirAll("/var/run", 0755)
+	err := os.MkdirAll("/var/run", 0755)
+	if err != nil {
+		return
+	}
 
 	if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
 		log.Printf("Error removing old socket: %v", err)

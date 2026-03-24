@@ -32,24 +32,84 @@ void send_func_name(uint32_t func_id, const char *name)
 uint32_t get_func_id(const zend_function *func)
 {
     if (UNEXPECTED(!func)) return 0;
+
+    /* Frame interne Zend sans filename → ignorer */
+    if (func->type == ZEND_USER_FUNCTION && func->op_array.filename == NULL) {
+        return 0;
+    }
+
     zend_ulong key = (zend_ulong)func;
-    zval *zid = zend_hash_index_find(&NEBULA_G(func_map), key);
-    if (zid) return (uint32_t)Z_LVAL_P(zid);
-    if (NEBULA_G(next_func_id) >= 1000000) return 0;
+    zval *cached = zend_hash_index_find(&NEBULA_G(func_map), key);
+    if (cached) return (uint32_t)Z_LVAL_P(cached);
+
+    char name[256];
+    name[0] = '\0';
+
+    const zend_op_array *op =
+        (func->type == ZEND_USER_FUNCTION) ? &func->op_array : NULL;
+
+    const char *func_name =
+        func->common.function_name ? ZSTR_VAL(func->common.function_name) : NULL;
+
+    const char *class_name =
+        (func->common.scope && func->common.scope->name)
+            ? ZSTR_VAL(func->common.scope->name)
+            : NULL;
+
+    if (!func_name && op && op->filename) {
+        const char *file = ZSTR_VAL(op->filename);
+        const char *base = strrchr(file, '/');
+        base = base ? base + 1 : file;
+        snprintf(name, sizeof(name), "%s", base);
+    }
+    else if (op && (func->common.fn_flags & ZEND_ACC_CLOSURE)) {
+        const char *file = op->filename ? ZSTR_VAL(op->filename) : "unknown";
+        const char *base = strrchr(file, '/');
+        base = base ? base + 1 : file;
+        snprintf(name, sizeof(name), "{closure}::%s/%u",
+                 base, (unsigned)op->line_start);
+    }
+    else if (class_name && func_name) {
+        snprintf(name, sizeof(name), "%s::%s", class_name, func_name);
+    }
+    else if (func_name) {
+        snprintf(name, sizeof(name), "%s", func_name);
+    }
+    else {
+        snprintf(name, sizeof(name), "internal::unknown");
+    }
+
     uint32_t id = NEBULA_G(next_func_id)++;
+    send_func_name(id, name);
+
     zval zv;
     ZVAL_LONG(&zv, (zend_long)id);
     zend_hash_index_add_new(&NEBULA_G(func_map), key, &zv);
-    const char *func_name  = func->common.function_name ? ZSTR_VAL(func->common.function_name) : NULL;
-    const char *class_name = (func->common.scope && func->common.scope->name)
-                             ? ZSTR_VAL(func->common.scope->name) : NULL;
-    char tmp[512];
-    if (class_name && func_name) snprintf(tmp, sizeof(tmp), "%s::%s", class_name, func_name);
-    else if (func_name) snprintf(tmp, sizeof(tmp), "%s", func_name);
-    else snprintf(tmp, sizeof(tmp), "Closure@%p", (void *)func);
-    send_func_name(id, tmp);
+
     return id;
 }
+
+/*uint32_t get_func_id(const zend_function *func)
+  {
+      if (UNEXPECTED(!func)) return 0;
+      zend_ulong key = (zend_ulong)func;
+      zval *zid = zend_hash_index_find(&NEBULA_G(func_map), key);
+      if (zid) return (uint32_t)Z_LVAL_P(zid);
+      if (NEBULA_G(next_func_id) >= 1000000) return 0;
+      uint32_t id = NEBULA_G(next_func_id)++;
+      zval zv;
+      ZVAL_LONG(&zv, (zend_long)id);
+      zend_hash_index_add_new(&NEBULA_G(func_map), key, &zv);
+      const char *func_name  = func->common.function_name ? ZSTR_VAL(func->common.function_name) : NULL;
+      const char *class_name = (func->common.scope && func->common.scope->name)
+                               ? ZSTR_VAL(func->common.scope->name) : NULL;
+      char tmp[512];
+      if (class_name && func_name) snprintf(tmp, sizeof(tmp), "%s::%s", class_name, func_name);
+      else if (func_name) snprintf(tmp, sizeof(tmp), "%s", func_name);
+      else snprintf(tmp, sizeof(tmp), "Closure@%p", (void *)func);
+      send_func_name(id, tmp);
+      return id;
+  }*/
 
 // --- fonctions neutres mais présentes pour compatibilité ---
 uint64_t get_cpu_time(void) { return 0; }

@@ -46,13 +46,14 @@ type Session struct {
 }
 
 type DetailedJSON struct {
-	Dimensions map[string]Dimension `json:"dimensions"`
-	Root       string               `json:"root"`
-	Nodes      map[string]JSONNode  `json:"nodes"`
-	Edges      map[string]JSONEdge  `json:"edges"`
-	Comparison bool                 `json:"comparison"`
-	Peaks      Peaks                `json:"peaks"`
-	Language   string               `json:"language"`
+	AgentSessionID string               `json:"agent_session_id"`
+	Dimensions     map[string]Dimension `json:"dimensions"`
+	Root           string               `json:"root"`
+	Nodes          map[string]JSONNode  `json:"nodes"`
+	Edges          map[string]JSONEdge  `json:"edges"`
+	Comparison     bool                 `json:"comparison"`
+	Peaks          Peaks                `json:"peaks"`
+	Language       string               `json:"language"`
 }
 
 type JSONEdge struct {
@@ -75,6 +76,8 @@ type Dimension struct {
 
 type JSONNode struct {
 	NodeID              string             `json:"nodeId"`
+	Name                string             `json:"name,omitempty"`
+	CalledClass         string             `json:"called_class,omitempty"`
 	Metrics             []string           `json:"metrics"`
 	InclusiveCost       map[string]int64   `json:"inclusive_cost"`
 	ExclusiveCost       map[string]int64   `json:"exclusive_cost"`
@@ -86,8 +89,6 @@ var (
 	FuncNames   = make(map[uint32]string)
 	FuncNamesMu sync.RWMutex
 )
-
-const NumShards = 32
 
 type SessionShard struct {
 	Sessions map[uint64]*Session

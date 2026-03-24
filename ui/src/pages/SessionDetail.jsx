@@ -1,7 +1,7 @@
-import SessionDetailView from "../views/SessionDetailView";
 import { useEffect, useState } from "react";
-import { api } from "../services/api";
 import { useParams } from "react-router-dom";
+import { api } from "../services/api";
+import SessionDetailView from "../views/SessionDetailView";
 
 export default function SessionDetail() {
     const { id } = useParams();
