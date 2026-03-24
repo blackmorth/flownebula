@@ -1,11 +1,12 @@
 import Layout from "../components/Layout";
-import { Heading, Spinner, Text, Tabs, Box } from "@chakra-ui/react";
+import { Heading, Spinner, Text, Tabs } from "@chakra-ui/react";
 import { ChevronRight, TreePine, Flame, FileJson } from "lucide-react";
 
 import OverviewTab from "./tabs/OverviewTab";
 import CallTreeTab from "./tabs/CallTreeTab";
 import FlamegraphTab from "./tabs/FlamegraphTab";
 import RawTab from "./tabs/RawTab";
+import CallFlowTab from "./tabs/CallFlowTab.jsx";
 
 export default function SessionDetailView({ loading, session }) {
     if (loading) {
@@ -42,6 +43,11 @@ export default function SessionDetailView({ loading, session }) {
                         Call Tree
                     </Tabs.Trigger>
 
+                    <Tabs.Trigger value="callflow">
+                        <ChevronRight size={16} />
+                        Call Flow
+                    </Tabs.Trigger>
+
                     <Tabs.Trigger value="flamegraph">
                         <Flame size={16} />
                         Flamegraph
@@ -59,6 +65,10 @@ export default function SessionDetailView({ loading, session }) {
 
                 <Tabs.Content value="calltree">
                     <CallTreeTab payload={payload} />
+                </Tabs.Content>
+
+                <Tabs.Content value="callflow">
+                    <CallFlowTab payload={payload} />
                 </Tabs.Content>
 
                 <Tabs.Content value="flamegraph">

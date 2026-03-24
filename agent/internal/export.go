@@ -80,7 +80,9 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 			return
 		}
 		nodeName, name, calledClass := parseNodeName(GetFuncName(n.FuncID))
-
+		if parentName == nodeName && n.FuncID == s.Root.FuncID {
+			return // skip only the root self-edge
+		}
 		// Récupère ou crée le nœud (fusion si même nom)
 		jNode, exists := jsonNodes[nodeName]
 		if !exists {
@@ -122,7 +124,7 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 		jsonNodes[nodeName] = jNode
 
 		// Arête vers ce nœud depuis son parent
-		if parentName != "" {
+		if parentName != "" && parentName != nodeName {
 			edgeKey := parentName + "→" + nodeName
 			if existingEdgeID, ok := edgesByKey[edgeKey]; ok {
 				// Fusion : additionner les coûts de l'arête
