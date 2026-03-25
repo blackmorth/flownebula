@@ -26,8 +26,6 @@ func Migrate(db *sql.DB) {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        agent_token TEXT UNIQUE NOT NULL,
-        agent_enabled BOOLEAN DEFAULT FALSE,
         roles TEXT DEFAULT '["ROLE_USER"]'
     );`
 
