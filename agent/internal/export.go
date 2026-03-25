@@ -74,8 +74,10 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 	edgesByKey := make(map[string]string) // "caller→callee" → edgeId
 	edgeCount := 0
 
-	var walkNode func(n *Node, parentName string)
-	walkNode = func(n *Node, parentName string) {
+	rootCanonicalName, _, _ := parseNodeName(GetFuncName(s.Root.FuncID))
+
+	var walkNode func(n *Node, parentName string, parentFuncID uint32)
+	walkNode = func(n *Node, parentName string, parentFuncID uint32) {
 		if n == nil {
 			return
 		}
@@ -84,7 +86,7 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 			// Skip only the duplicated root self-edge node, but keep traversing
 			// its children so the real call flow is not dropped.
 			for _, child := range n.Children {
-				walkNode(child, nodeName)
+				walkNode(child, nodeName, n.FuncID)
 			}
 			return
 		}
@@ -132,39 +134,47 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 		// Keep recursive self-edges (foo -> foo), they carry recursion call counts.
 		// The duplicated root self-edge is already filtered above.
 		if parentName != "" {
-			edgeKey := parentName + "→" + nodeName
-			if existingEdgeID, ok := edgesByKey[edgeKey]; ok {
-				// Fusion : additionner les coûts de l'arête
-				e := jsonEdges[existingEdgeID]
-				for k, v := range n.Metrics {
-					if k != "ewt" {
-						e.Cost[k] += v
+			// Ignore only direct synthetic request-entry self edge (same rendered
+			// name as root but different func IDs), while keeping true recursion.
+			isSyntheticRootSelfEdge := parentFuncID == s.Root.FuncID &&
+				n.FuncID != s.Root.FuncID &&
+				parentName == nodeName &&
+				parentName == rootCanonicalName
+			if !isSyntheticRootSelfEdge {
+				edgeKey := parentName + "→" + nodeName
+				if existingEdgeID, ok := edgesByKey[edgeKey]; ok {
+					// Fusion : additionner les coûts de l'arête
+					e := jsonEdges[existingEdgeID]
+					for k, v := range n.Metrics {
+						if k != "ewt" {
+							e.Cost[k] += v
+						}
 					}
-				}
-				jsonEdges[existingEdgeID] = e
-			} else {
-				edgeCount++
-				edgeID := fmt.Sprintf("e%d", edgeCount)
-				edgesByKey[edgeKey] = edgeID
+					jsonEdges[existingEdgeID] = e
+				} else {
+					edgeCount++
+					edgeID := fmt.Sprintf("e%d", edgeCount)
+					edgesByKey[edgeKey] = edgeID
 
-				cost := map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "nw_in": 0, "nw_out": 0}
-				for k, v := range n.Metrics {
-					if k != "ewt" {
-						cost[k] = v
+					cost := map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "nw_in": 0, "nw_out": 0}
+					for k, v := range n.Metrics {
+						if k != "ewt" {
+							cost[k] = v
+						}
 					}
-				}
-				jsonEdges[edgeID] = JSONEdge{
-					EdgeID: edgeID,
-					Caller: parentName,
-					Callee: nodeName,
-					Cost:   cost,
+					jsonEdges[edgeID] = JSONEdge{
+						EdgeID: edgeID,
+						Caller: parentName,
+						Callee: nodeName,
+						Cost:   cost,
+					}
 				}
 			}
 		}
 
 		// Récursion sur les enfants
 		for _, child := range n.Children {
-			walkNode(child, nodeName)
+			walkNode(child, nodeName, n.FuncID)
 		}
 	}
 
@@ -172,7 +182,7 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 	// on promeut cet enfant comme root réel.
 	startNode := s.Root
 	startName := ""
-	walkNode(startNode, startName)
+	walkNode(startNode, startName, 0)
 
 	if len(jsonNodes) == 0 {
 		return nil, fmt.Errorf("no nodes to export")
