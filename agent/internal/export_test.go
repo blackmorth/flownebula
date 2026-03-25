@@ -178,3 +178,104 @@ func TestExportToDetailedJSONKeepsRecursiveSelfEdge(t *testing.T) {
 		t.Fatalf("expected recursive edge bar -> bar ct=2, got %d (edges: %#v)", barToBarCt, out.Edges)
 	}
 }
+
+func TestExportToDetailedJSONSkipsSyntheticRootSelfEdgeWithDifferentFuncID(t *testing.T) {
+	FuncNamesMu.Lock()
+	FuncNames = map[uint32]string{
+		1: "test.php",
+		2: "test.php",
+		3: "foo",
+	}
+	FuncNamesMu.Unlock()
+
+	s := &Session{
+		ID:   0x44,
+		Root: NewNode(0, 1),
+	}
+
+	// Synthetic request entry and script-level frame share the same rendered name.
+	entryFrame := NewNode(1, 2)
+	entryFrame.Metrics["ct"] = 1
+	entryFrame.Metrics["wt"] = 11
+
+	foo := NewNode(2, 3)
+	foo.Metrics["ct"] = 1
+	foo.Metrics["wt"] = 7
+
+	entryFrame.Children[3] = foo
+	s.Root.Children[2] = entryFrame
+
+	raw, err := s.ExportToDetailedJSON()
+	if err != nil {
+		t.Fatalf("ExportToDetailedJSON failed: %v", err)
+	}
+
+	var out DetailedJSON
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	for _, e := range out.Edges {
+		if e.Caller == "test.php" && e.Callee == "test.php" {
+			t.Fatalf("unexpected synthetic self edge test.php -> test.php in edges: %#v", out.Edges)
+		}
+	}
+
+	foundFooEdge := false
+	for _, e := range out.Edges {
+		if e.Caller == "test.php" && e.Callee == "foo" {
+			foundFooEdge = true
+			break
+		}
+	}
+	if !foundFooEdge {
+		t.Fatalf("expected edge test.php -> foo, got edges: %#v", out.Edges)
+	}
+}
+
+func TestExportToDetailedJSONKeepsEdgeToRootNamedNodeWhenNotDirectChildOfRoot(t *testing.T) {
+	FuncNamesMu.Lock()
+	FuncNames = map[uint32]string{
+		1: "test.php",
+		2: "worker.php",
+		3: "test.php",
+	}
+	FuncNamesMu.Unlock()
+
+	s := &Session{
+		ID:   0x45,
+		Root: NewNode(0, 1),
+	}
+
+	worker := NewNode(1, 2)
+	worker.Metrics["ct"] = 1
+	worker.Metrics["wt"] = 5
+
+	backToRootName := NewNode(2, 3)
+	backToRootName.Metrics["ct"] = 1
+	backToRootName.Metrics["wt"] = 6
+
+	worker.Children[3] = backToRootName
+	s.Root.Children[2] = worker
+
+	raw, err := s.ExportToDetailedJSON()
+	if err != nil {
+		t.Fatalf("ExportToDetailedJSON failed: %v", err)
+	}
+
+	var out DetailedJSON
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	foundEdge := false
+	for _, e := range out.Edges {
+		if e.Caller == "worker.php" && e.Callee == "test.php" {
+			foundEdge = true
+			break
+		}
+	}
+	if !foundEdge {
+		t.Fatalf("expected edge worker.php -> test.php, got edges: %#v", out.Edges)
+	}
+}
