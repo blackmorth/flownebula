@@ -1,40 +1,27 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import buildTree from "../../utils/buildTree";
 
-function formatDuration(us) {
-    const value = Number.isFinite(us) ? us : 0;
+function formatDuration(ns) {
+    const value = Number.isFinite(ns) ? Math.max(ns, 0) : 0;
 
-    if (value >= 1000) {
-        return `${new Intl.NumberFormat("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(value / 1000)} ms`;
-    }
+    const units = [
+        { size: 3_600_000_000_000, label: "h" },
+        { size: 60_000_000_000, label: "m" },
+        { size: 1_000_000_000, label: "s" },
+        { size: 1_000_000, label: "ms" },
+        { size: 1_000, label: "µs" },
+    ];
 
-    return `${new Intl.NumberFormat("en-US").format(Math.round(value))} µs`;
-}
-
-function collapseSmallNodes(tree, parentCost, threshold = 0.01) {
-    const effectiveParentCost = Math.max(parentCost || tree.cost || 1, 1);
-    const children = [];
-    const collapsed = { id: `${tree.id}-other`, name: "(other)", cost: 0, children: [] };
-
-    for (const child of tree.children) {
-        const ratio = child.cost / effectiveParentCost;
-
-        if (ratio < threshold) {
-            collapsed.cost += child.cost;
-            collapsed.children.push(child);
-        } else {
-            children.push(collapseSmallNodes(child, child.cost, threshold));
+    for (const unit of units) {
+        if (value >= unit.size) {
+            return `${new Intl.NumberFormat("en-US", {
+                minimumFractionDigits: value >= unit.size * 10 ? 0 : 2,
+                maximumFractionDigits: 2,
+            }).format(value / unit.size)} ${unit.label}`;
         }
     }
 
-    if (collapsed.cost > 0) {
-        children.push(collapsed);
-    }
-
-    return { ...tree, children };
+    return `${new Intl.NumberFormat("en-US").format(Math.round(value))} ns`;
 }
 
 function CallTree({ node, depth = 0, total = node.cost || 1 }) {
@@ -70,7 +57,6 @@ function CallTree({ node, depth = 0, total = node.cost || 1 }) {
 
 export default function CallTreeTab({ payload }) {
     const tree = buildTree(payload);
-    const collapsed = collapseSmallNodes(tree, tree.cost);
 
-    return <CallTree node={collapsed} total={Math.max(collapsed.cost, 1)} />;
+    return <CallTree node={tree} total={Math.max(tree.cost, 1)} />;
 }
