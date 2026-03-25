@@ -1,11 +1,10 @@
 package api
 
 import (
-	"flownebula/server/internal/agentapi"
 	"flownebula/server/internal/auth"
 	"flownebula/server/internal/db"
 	"flownebula/server/internal/middleware"
-	"flownebula/server/internal/profiles"
+	"flownebula/server/internal/scripts"
 	"flownebula/server/internal/sessions"
 
 	"github.com/gofiber/fiber/v2"
@@ -28,32 +27,22 @@ func New() *fiber.App {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
 	})
+
 	sqlite := db.Open("nebula.db")
 	db.Migrate(sqlite)
 
 	authRepo := auth.NewSQLiteRepo(sqlite)
 	sessionRepo := sessions.NewSQLiteRepo(sqlite)
-	profilesRepo := profiles.NewSQLiteRepo(sqlite)
 
 	auth.RegisterRoutes(app, authRepo)
-
-	// Middleware appliqué ici (hors du package auth)
 	authProtected := app.Group("/auth", middleware.JWTProtected())
 	auth.RegisterProctectedRoutes(authProtected, authRepo)
 
-	admin := app.Group("/admin",
-		middleware.JWTProtected(),
-		middleware.RequireRole("ROLE_ADMIN"),
-	)
+	protectedSessions := app.Group("/sessions", middleware.JWTProtected())
+	sessions.RegisterRoutes(protectedSessions, sessionRepo)
 
-	auth.RegisterAdminRoutes(admin, authRepo)
-
-	protected := app.Group("/sessions", middleware.JWTProtected())
-	sessions.RegisterRoutes(protected, sessionRepo)
-
-	agent := app.Group("/agent", middleware.JWTProtected())
-	agentapi.RegisterRoutes(agent, sessionRepo)
-	profiles.RegisterRoutes(agent, profilesRepo)
+	protectedScripts := app.Group("/scripts", middleware.JWTProtected())
+	scripts.RegisterRoutes(protectedScripts, sessionRepo)
 
 	return app
 }
