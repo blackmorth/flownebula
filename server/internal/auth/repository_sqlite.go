@@ -15,6 +15,14 @@ func NewSQLiteRepo(db *sql.DB) UserRepository {
 }
 
 func (r *sqliteRepo) Create(user *User) error {
+	var usersCount int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&usersCount); err != nil {
+		return err
+	}
+	if usersCount == 0 {
+		user.Roles = []string{"ROLE_ADMIN", "ROLE_USER"}
+	}
+
 	rolesJSON, _ := json.Marshal(user.Roles)
 
 	res, err := r.db.Exec(`
@@ -129,5 +137,13 @@ func (r *sqliteRepo) UpdateAgentToken(id int64, token string) error {
 	_, err := r.db.Exec(`
         UPDATE users SET agent_token = ? WHERE id = ?
     `, token, id)
+	return err
+}
+
+func (r *sqliteRepo) UpdateRoles(id int64, roles []string) error {
+	rolesJSON, _ := json.Marshal(roles)
+	_, err := r.db.Exec(`
+        UPDATE users SET roles = ? WHERE id = ?
+    `, string(rolesJSON), id)
 	return err
 }

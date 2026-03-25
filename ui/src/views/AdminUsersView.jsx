@@ -11,6 +11,8 @@ import { Table } from "@chakra-ui/react/table";
 export default function AdminUsersView({
                                            loading,
                                            users,
+                                           promoteAdmin,
+                                           demoteAdmin,
                                            enableAgent,
                                            disableAgent,
                                            regenerateToken,
@@ -79,6 +81,24 @@ export default function AdminUsersView({
 
                                 <Table.Cell>
                                     <HStack spacing={2}>
+                                        {u.roles.includes("ROLE_ADMIN") ? (
+                                            <Button
+                                                size="sm"
+                                                colorScheme="orange"
+                                                onClick={() => demoteAdmin(u.id)}
+                                            >
+                                                Demote
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                colorScheme="blue"
+                                                onClick={() => promoteAdmin(u.id)}
+                                            >
+                                                Promote
+                                            </Button>
+                                        )}
+
                                         {u.agent_enabled ? (
                                             <Button
                                                 size="sm"

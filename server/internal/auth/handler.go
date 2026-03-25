@@ -242,7 +242,73 @@ func RegisterAdminRoutes(router fiber.Router, repo UserRepository) {
 	h := NewHandler(repo)
 
 	router.Get("/users", h.ListUsers)
+	router.Post("/users/:id/promote-admin", h.PromoteAdmin)
+	router.Post("/users/:id/demote-admin", h.DemoteAdmin)
 	router.Post("/users/:id/agent/enable", h.EnableAgent)
 	router.Post("/users/:id/agent/disable", h.DisableAgent)
 	router.Post("/users/:id/agent/regenerate", h.RegenerateAgentToken)
+}
+
+func (h *Handler) PromoteAdmin(c *fiber.Ctx) error {
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user id"})
+	}
+
+	user, err := h.repo.FindByID(id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+	}
+
+	if hasRole(user.Roles, "ROLE_ADMIN") {
+		return c.JSON(fiber.Map{"status": "already admin"})
+	}
+
+	roles := append(user.Roles, "ROLE_ADMIN")
+	if err := h.repo.UpdateRoles(id, roles); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to promote user"})
+	}
+
+	return c.JSON(fiber.Map{"status": "promoted"})
+}
+
+func (h *Handler) DemoteAdmin(c *fiber.Ctx) error {
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user id"})
+	}
+
+	user, err := h.repo.FindByID(id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+	}
+
+	if !hasRole(user.Roles, "ROLE_ADMIN") {
+		return c.JSON(fiber.Map{"status": "already user"})
+	}
+
+	var roles []string
+	for _, role := range user.Roles {
+		if role != "ROLE_ADMIN" {
+			roles = append(roles, role)
+		}
+	}
+	if len(roles) == 0 {
+		roles = []string{"ROLE_USER"}
+	}
+
+	if err := h.repo.UpdateRoles(id, roles); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to demote user"})
+	}
+
+	return c.JSON(fiber.Map{"status": "demoted"})
+}
+
+func hasRole(roles []string, expected string) bool {
+	for _, role := range roles {
+		if role == expected {
+			return true
+		}
+	}
+	return false
 }
