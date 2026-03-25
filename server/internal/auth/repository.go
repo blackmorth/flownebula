@@ -8,4 +8,5 @@ type UserRepository interface {
 	FindAll() ([]*User, error)
 	UpdateAgentEnabled(id int64, enabled bool) error
 	UpdateAgentToken(id int64, token string) error
+	UpdateRoles(id int64, roles []string) error
 }

@@ -29,11 +29,19 @@ export default function AdminUsers() {
     const regenerateToken = (id) =>
         api("POST", `/admin/users/${id}/agent/regenerate`, null, token).then(loadUsers);
 
+    const promoteAdmin = (id) =>
+        api("POST", `/admin/users/${id}/promote-admin`, null, token).then(loadUsers);
+
+    const demoteAdmin = (id) =>
+        api("POST", `/admin/users/${id}/demote-admin`, null, token).then(loadUsers);
+
     return (
         <AdminLayout>
             <AdminUsersView
                 loading={loading}
                 users={users}
+                promoteAdmin={promoteAdmin}
+                demoteAdmin={demoteAdmin}
                 enableAgent={enableAgent}
                 disableAgent={disableAgent}
                 regenerateToken={regenerateToken}
