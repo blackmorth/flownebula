@@ -37,4 +37,39 @@ describe('buildTree', () => {
       ],
     })
   })
+
+  it('stops building when a cycle is detected', () => {
+    const payload = {
+      root: 'n1',
+      nodes: {
+        n1: { nodeId: 'root', inclusive_cost: { wt: 20 } },
+        n2: { nodeId: 'childA', inclusive_cost: { wt: 15 } },
+      },
+      edges: {
+        e1: { caller: 'n1', callee: 'n2' },
+        e2: { caller: 'n2', callee: 'n2' },
+      },
+    }
+
+    expect(buildTree(payload)).toEqual({
+      id: 'n1',
+      name: 'root',
+      cost: 20,
+      children: [
+        {
+          id: 'n2',
+          name: 'childA',
+          cost: 15,
+          children: [
+            {
+              id: 'n2',
+              name: 'childA (recursion)',
+              cost: 0,
+              children: [],
+            },
+          ],
+        },
+      ],
+    })
+  })
 })
