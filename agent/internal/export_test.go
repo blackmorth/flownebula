@@ -1,6 +1,9 @@
 package internal
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestParseNodeNameVariants(t *testing.T) {
 	tests := []struct {
@@ -66,5 +69,54 @@ func TestRound3(t *testing.T) {
 		if got != tc.want {
 			t.Fatalf("round3(%v) = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestExportToDetailedJSONKeepsChildrenWhenRootSelfEdgeIsSkipped(t *testing.T) {
+	FuncNamesMu.Lock()
+	FuncNames = map[uint32]string{
+		1: "test.php",
+		2: "foo",
+	}
+	FuncNamesMu.Unlock()
+
+	s := &Session{
+		ID:   0x42,
+		Root: NewNode(0, 1),
+	}
+
+	// Reproduce shape created by RINIT + first ENTER:
+	// root(1) -> child(1) -> foo(2)
+	dupRoot := NewNode(1, 1)
+	foo := NewNode(2, 2)
+	foo.Metrics["ct"] = 1
+	foo.Metrics["wt"] = 10
+
+	dupRoot.Children[2] = foo
+	s.Root.Children[1] = dupRoot
+
+	raw, err := s.ExportToDetailedJSON()
+	if err != nil {
+		t.Fatalf("ExportToDetailedJSON failed: %v", err)
+	}
+
+	var out DetailedJSON
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if _, ok := out.Nodes["foo"]; !ok {
+		t.Fatalf("expected foo node to be present, got nodes: %#v", out.Nodes)
+	}
+
+	foundEdge := false
+	for _, e := range out.Edges {
+		if e.Caller == "test.php" && e.Callee == "foo" {
+			foundEdge = true
+			break
+		}
+	}
+	if !foundEdge {
+		t.Fatalf("expected edge test.php -> foo, got edges: %#v", out.Edges)
 	}
 }

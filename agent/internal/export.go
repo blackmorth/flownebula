@@ -81,7 +81,12 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 		}
 		nodeName, name, calledClass := parseNodeName(GetFuncName(n.FuncID))
 		if parentName == nodeName && n.FuncID == s.Root.FuncID {
-			return // skip only the root self-edge
+			// Skip only the duplicated root self-edge node, but keep traversing
+			// its children so the real call flow is not dropped.
+			for _, child := range n.Children {
+				walkNode(child, nodeName)
+			}
+			return
 		}
 		// Récupère ou crée le nœud (fusion si même nom)
 		jNode, exists := jsonNodes[nodeName]
