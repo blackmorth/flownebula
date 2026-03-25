@@ -120,3 +120,61 @@ func TestExportToDetailedJSONKeepsChildrenWhenRootSelfEdgeIsSkipped(t *testing.T
 		t.Fatalf("expected edge test.php -> foo, got edges: %#v", out.Edges)
 	}
 }
+
+func TestExportToDetailedJSONKeepsRecursiveSelfEdge(t *testing.T) {
+	FuncNamesMu.Lock()
+	FuncNames = map[uint32]string{
+		1: "test.php",
+		2: "bar",
+	}
+	FuncNamesMu.Unlock()
+
+	s := &Session{
+		ID:   0x43,
+		Root: NewNode(0, 1),
+	}
+
+	// test.php -> bar -> bar -> bar
+	bar1 := NewNode(1, 2)
+	bar1.Metrics["ct"] = 1
+	bar1.Metrics["wt"] = 10
+
+	bar2 := NewNode(2, 2)
+	bar2.Metrics["ct"] = 1
+	bar2.Metrics["wt"] = 20
+
+	bar3 := NewNode(3, 2)
+	bar3.Metrics["ct"] = 1
+	bar3.Metrics["wt"] = 30
+
+	bar2.Children[2] = bar3
+	bar1.Children[2] = bar2
+	s.Root.Children[2] = bar1
+
+	raw, err := s.ExportToDetailedJSON()
+	if err != nil {
+		t.Fatalf("ExportToDetailedJSON failed: %v", err)
+	}
+
+	var out DetailedJSON
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	var rootToBarCt, barToBarCt int64
+	for _, e := range out.Edges {
+		if e.Caller == "test.php" && e.Callee == "bar" {
+			rootToBarCt += e.Cost["ct"]
+		}
+		if e.Caller == "bar" && e.Callee == "bar" {
+			barToBarCt += e.Cost["ct"]
+		}
+	}
+
+	if rootToBarCt != 1 {
+		t.Fatalf("expected edge test.php -> bar ct=1, got %d (edges: %#v)", rootToBarCt, out.Edges)
+	}
+	if barToBarCt != 2 {
+		t.Fatalf("expected recursive edge bar -> bar ct=2, got %d (edges: %#v)", barToBarCt, out.Edges)
+	}
+}

@@ -128,8 +128,10 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 		}
 		jsonNodes[nodeName] = jNode
 
-		// Arête vers ce nœud depuis son parent
-		if parentName != "" && parentName != nodeName {
+		// Arête vers ce nœud depuis son parent.
+		// Keep recursive self-edges (foo -> foo), they carry recursion call counts.
+		// The duplicated root self-edge is already filtered above.
+		if parentName != "" {
 			edgeKey := parentName + "→" + nodeName
 			if existingEdgeID, ok := edgesByKey[edgeKey]; ok {
 				// Fusion : additionner les coûts de l'arête
