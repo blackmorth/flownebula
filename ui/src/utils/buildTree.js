@@ -1,32 +1,23 @@
 export default function buildTree(payload) {
-    const nodes = payload.nodes;
-    const edges = payload.edges;
+    const nodes = payload?.nodes || {};
+    const edges = payload?.edges || {};
 
     const children = {};
-    for (const e of Object.values(edges)) {
-        if (!children[e.caller]) children[e.caller] = [];
-        children[e.caller].push(e.callee);
+    for (const edge of Object.values(edges)) {
+        if (!children[edge.caller]) children[edge.caller] = [];
+        children[edge.caller].push(edge);
     }
 
-    function build(id, path = new Set()) {
+    function build(id, path = new Set(), viaEdge = null) {
         const node = nodes[id];
-
-        if (!node) {
-            return {
-                id,
-                name: id,
-                cost: 0,
-                children: []
-            };
-        }
-
+        const displayName = node?.nodeId || id;
         const inCurrentPath = path.has(id);
 
         if (inCurrentPath) {
             return {
-                id,
-                name: `${node.nodeId} (recursion)`,
-                cost: 0,
+                id: viaEdge?.edgeId ? `${id}#${viaEdge.edgeId}` : id,
+                name: `${displayName} (recursion)`,
+                cost: viaEdge?.cost?.wt || 0,
                 children: []
             };
         }
@@ -34,16 +25,15 @@ export default function buildTree(payload) {
         path.add(id);
 
         const built = {
-            id,
-            name: node.nodeId,
-            cost: node.inclusive_cost?.wt || 0,
-            children: (children[id] || []).map(childId => build(childId, path))
+            id: viaEdge?.edgeId ? `${id}#${viaEdge.edgeId}` : id,
+            name: displayName,
+            cost: viaEdge?.cost?.wt ?? node?.inclusive_cost?.wt ?? 0,
+            children: (children[id] || []).map((edge) => build(edge.callee, path, edge))
         };
 
         path.delete(id);
-
         return built;
     }
 
-    return build(payload.root);
+    return build(payload?.root || "root");
 }

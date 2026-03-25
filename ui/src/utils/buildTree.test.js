@@ -11,8 +11,8 @@ describe('buildTree', () => {
         n3: { nodeId: 'childB', inclusive_cost: { wt: 5 } },
       },
       edges: {
-        e1: { caller: 'n1', callee: 'n2' },
-        e2: { caller: 'n2', callee: 'n3' },
+        e1: { edgeId: 'e1', caller: 'n1', callee: 'n2', cost: { wt: 15 } },
+        e2: { edgeId: 'e2', caller: 'n2', callee: 'n3', cost: { wt: 5 } },
       },
     }
 
@@ -22,12 +22,12 @@ describe('buildTree', () => {
       cost: 20,
       children: [
         {
-          id: 'n2',
+          id: 'n2#e1',
           name: 'childA',
           cost: 15,
           children: [
             {
-              id: 'n3',
+              id: 'n3#e2',
               name: 'childB',
               cost: 5,
               children: [],
@@ -38,7 +38,7 @@ describe('buildTree', () => {
     })
   })
 
-  it('stops building when a cycle is detected', () => {
+  it('uses edge wall time for recursion entries instead of forcing 0', () => {
     const payload = {
       root: 'n1',
       nodes: {
@@ -46,8 +46,8 @@ describe('buildTree', () => {
         n2: { nodeId: 'childA', inclusive_cost: { wt: 15 } },
       },
       edges: {
-        e1: { caller: 'n1', callee: 'n2' },
-        e2: { caller: 'n2', callee: 'n2' },
+        e1: { edgeId: 'e1', caller: 'n1', callee: 'n2', cost: { wt: 15 } },
+        e2: { edgeId: 'e2', caller: 'n2', callee: 'n2', cost: { wt: 9 } },
       },
     }
 
@@ -57,14 +57,14 @@ describe('buildTree', () => {
       cost: 20,
       children: [
         {
-          id: 'n2',
+          id: 'n2#e1',
           name: 'childA',
           cost: 15,
           children: [
             {
-              id: 'n2',
+              id: 'n2#e2',
               name: 'childA (recursion)',
-              cost: 0,
+              cost: 9,
               children: [],
             },
           ],
