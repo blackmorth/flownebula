@@ -1,6 +1,6 @@
 import Layout from "../components/Layout";
 import { Heading, Spinner, Text, Tabs } from "@chakra-ui/react";
-import { ChevronRight, TreePine, Flame, FileJson, Timeline } from "lucide-react";
+import { ChevronRight, TreePine, Flame, FileJson, Clock3 } from "lucide-react";
 
 import OverviewTab from "./tabs/OverviewTab";
 import CallTreeTab from "./tabs/CallTreeTab";
@@ -49,7 +49,7 @@ export default function SessionDetailView({ loading, session }) {
                         Call Flow
                     </Tabs.Trigger>
                     <Tabs.Trigger value="timeline">
-                        <Timeline size={16} />
+                        <Clock3 size={16} />
                         Timeline
                     </Tabs.Trigger>
 
