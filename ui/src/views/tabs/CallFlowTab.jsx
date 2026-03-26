@@ -48,7 +48,6 @@ export default function CallFlowTab({ payload }) {
             .fit(true)
             .renderDot(dot)
             .on("end", () => {
-                enhanceGraphNodes(ref.current, payload, selectedNodeId);
                 highlightSelectedSvgNode(ref.current, selectedNodeId);
             });
     }, [payload, selectedNodeId, rows, graphSize]);
@@ -308,7 +307,7 @@ function buildDot(payload, selectedNodeId) {
     let dot = `
 digraph CallFlow {
     graph [rankdir=TB, splines=true, overlap=false, nodesep=0.4, ranksep=0.8, pad=0.2, bgcolor="#ffffff"];
-    node [shape=box, style="filled", penwidth=1.2, fontname="Inter", fontsize=11, margin="0.22,0.16", fillcolor="#f8fafc", color="#334155", fontcolor="#0f172a", class="profile-node"];
+    node [shape=plain, style="filled", penwidth=1.2, fontname="Inter", fontsize=11, margin="0.06,0.04", fillcolor="#f8fafc", color="#334155", fontcolor="#0f172a", class="profile-node"];
     edge [fontname="Inter", fontsize=10, color="#64748b", fontcolor="#334155", arrowsize=0.75, labeldistance=1.5, labelfloat=false];
 `;
 
@@ -317,11 +316,17 @@ digraph CallFlow {
         const isSelected = n.nodeId === selectedNodeId;
         const wtPct = n.inclusive_percentage?.wt || 0;
         const { header, functionName } = nodeLabelParts(n);
-        const label = `${shortName(header)}\\n${shortName(functionName)}\\n${wtPct.toFixed(2)}%`;
+        const label = buildHtmlNodeLabel({
+            header: shortName(header),
+            functionName: shortName(functionName),
+            percentage: `${wtPct.toFixed(2)}%`,
+            selected: isSelected,
+            root: isRoot,
+        });
 
-        dot += `    "${escapeDot(n.nodeId)}" [label="${escapeDot(label)}"${
-            isRoot ? ', fillcolor="#e2e8f0", color="#1e293b", penwidth=1.8' : ""
-        }${isSelected ? ', class="selected-node active-node"' : ""}];\n`;
+        dot += `    "${escapeDot(n.nodeId)}" [label=<${label}>${
+            isSelected ? ', class="selected-node active-node"' : ""
+        }];\n`;
     });
 
     dot += "\n";
@@ -359,106 +364,9 @@ function highlightSelectedSvgNode(container, selectedNodeId) {
     });
 }
 
-function enhanceGraphNodes(container, payload, selectedNodeId) {
-    const svg = container.querySelector("svg");
-    if (!svg) return;
-
-    const nodeMap = Object.values(payload?.nodes || {}).reduce((acc, node) => {
-        acc[node.nodeId] = node;
-        return acc;
-    }, {});
-
-    svg.querySelectorAll("g.node").forEach((nodeGroup) => {
-        const nodeId = nodeGroup.querySelector("title")?.textContent;
-        if (!nodeId) return;
-        const node = nodeMap[nodeId];
-        if (!node) return;
-
-        const textNode = nodeGroup.querySelector("text");
-        if (!textNode) return;
-
-        const bbox = textNode.getBBox();
-        const paddingX = 16;
-        const paddingY = 12;
-        const width = Math.max(220, bbox.width + paddingX * 2);
-        const height = 94;
-
-        const { header, functionName } = nodeLabelParts(node);
-        const percentage = `${(node.inclusive_percentage?.wt || 0).toFixed(2)}%`;
-        const active = nodeId === selectedNodeId;
-
-        nodeGroup.querySelectorAll("polygon, path, ellipse, rect, text").forEach((el) => {
-            if (el.tagName !== "title") el.remove();
-        });
-
-        const createRect = (x, y, w, h, cls, extra = {}) => {
-            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            rect.setAttribute("x", String(x));
-            rect.setAttribute("y", String(y));
-            rect.setAttribute("width", String(w));
-            rect.setAttribute("height", String(h));
-            rect.setAttribute("class", cls);
-            Object.entries(extra).forEach(([key, val]) => rect.setAttribute(key, String(val)));
-            nodeGroup.appendChild(rect);
-        };
-
-        createRect(-width / 2, -height / 2, width, height, "selection", {
-            rx: 0,
-            ry: 0,
-            fill: "transparent",
-            stroke: active ? "#6b46c1" : "#334155",
-            "stroke-width": active ? 2.2 : 1.2,
-        });
-        createRect(-(width / 2 + 4), -(height / 2 + 4), width + 8, height + 8, "inclusive-cost", {
-            rx: 8,
-            ry: 8,
-            fill: active ? "rgba(138,77,255,0.16)" : "rgba(138,77,255,0.09)",
-            stroke: "none",
-        });
-
-        const foreign = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
-        foreign.setAttribute("x", String(-(width / 2)));
-        foreign.setAttribute("y", String(-(height / 2)));
-        foreign.setAttribute("width", String(width));
-        foreign.setAttribute("height", String(height));
-
-        const html = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-        html.style.height = "100%";
-        html.style.width = "100%";
-        html.style.display = "flex";
-        html.style.flexDirection = "column";
-        html.style.justifyContent = "space-between";
-        html.style.padding = "8px 10px";
-        html.style.boxSizing = "border-box";
-        html.style.fontFamily = "Inter, sans-serif";
-        html.style.color = "#0f172a";
-        html.style.background = "rgba(248,250,252,0.9)";
-        html.style.borderRadius = "6px";
-
-        html.innerHTML = `
-            <div style="font-size:11px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(shortName(header))}</div>
-            <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(shortName(functionName))}</div>
-            <div style="font-size:12px; display:flex; align-items:center; gap:6px;">
-                <span style="display:inline-block; width:8px; height:8px; border-radius:999px; background:#7fe392;"></span>
-                <span>${percentage}</span>
-            </div>
-        `;
-
-        foreign.appendChild(html);
-        nodeGroup.appendChild(foreign);
-    });
-}
-
 function shortName(value = "") {
     const str = String(value);
     return str.length > 28 ? `${str.slice(0, 28)}…` : str;
-}
-
-function shortFile(value = "") {
-    const str = String(value);
-    if (!str.includes("/")) return str;
-    const parts = str.split("/");
-    return parts.slice(-2).join("/");
 }
 
 function nodeLabelParts(node) {
@@ -496,6 +404,18 @@ function escapeHtml(value = "") {
         .replace(/>/g, "&gt;")
         .replace(/\"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+function buildHtmlNodeLabel({ header, functionName, percentage, selected, root }) {
+    const borderColor = selected ? "#6b46c1" : root ? "#1e293b" : "#334155";
+    const background = selected ? "#efe7ff" : root ? "#e2e8f0" : "#f8fafc";
+
+    return `
+<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" COLOR="${borderColor}" BGCOLOR="${background}">
+    <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
+</TABLE>`;
 }
 
 function formatUs(value) {
