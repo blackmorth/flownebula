@@ -106,7 +106,7 @@ export default function CallFlowTab({ payload }) {
                 overflow="auto"
                 p={2}
             >
-                <div ref={ref} style={{ minWidth: "100%", minHeight: "100%" }} />
+                <div ref={ref} style={{ width: "100%", height: "100%" }} />
             </Box>
         </Flex>
     );
@@ -284,8 +284,8 @@ function buildDot(payload, selectedNodeId) {
 
     let dot = `
 digraph CallFlow {
-    graph [rankdir=LR, splines=true, overlap=false, nodesep=0.45, ranksep=0.7, pad=0.2, bgcolor="#ffffff"];
-    node [shape=box, style="rounded,filled", penwidth=1.1, fontname="Inter", fontsize=11, margin="0.18,0.10", fillcolor="#f8fafc", color="#334155", fontcolor="#0f172a", class="profile-node"];
+    graph [rankdir=TB, splines=true, overlap=false, nodesep=0.4, ranksep=0.8, pad=0.2, bgcolor="#ffffff"];
+    node [shape=box, style="filled", penwidth=1.2, fontname="Inter", fontsize=11, margin="0.22,0.16", fillcolor="#f8fafc", color="#334155", fontcolor="#0f172a", class="profile-node"];
     edge [fontname="Inter", fontsize=10, color="#64748b", fontcolor="#334155", arrowsize=0.75, labeldistance=1.5, labelfloat=false];
 `;
 
@@ -293,10 +293,11 @@ digraph CallFlow {
         const isRoot = n.nodeId === root;
         const isSelected = n.nodeId === selectedNodeId;
         const wtPct = n.inclusive_percentage?.wt || 0;
-        const label = `${shortName(n.name || n.nodeId)}\\n${shortFile(n.nodeId)}\\n${wtPct.toFixed(2)}%`;
+        const { header, functionName } = nodeLabelParts(n.name || n.nodeId);
+        const label = `${shortName(header)}\\n${shortName(functionName)}\\n${wtPct.toFixed(2)}%`;
 
         dot += `    "${escapeDot(n.nodeId)}" [label="${escapeDot(label)}"${
-            isRoot ? ', shape=doubleoctagon, fillcolor="#e2e8f0", color="#1e293b", penwidth=1.6' : ""
+            isRoot ? ', fillcolor="#e2e8f0", color="#1e293b", penwidth=1.8' : ""
         }${isSelected ? ', class="selected-node active-node"' : ""}];\n`;
     });
 
@@ -306,7 +307,7 @@ digraph CallFlow {
         const ct = e.cost?.ct || 0;
         const wt = e.cost?.wt || 0;
 
-        const label = `${formatCount(ct)} call${ct > 1 ? "s" : ""}\\n${formatUs(wt)}`;
+        const label = `${formatCount(ct)}x`;
         const penwidth = 1.2 + (ct / maxCt) * 4.2;
         const stroke = interpolateHex("#94a3b8", "#1e293b", wt / maxWt);
 
@@ -345,6 +346,29 @@ function shortFile(value = "") {
     if (!str.includes("/")) return str;
     const parts = str.split("/");
     return parts.slice(-2).join("/");
+}
+
+function nodeLabelParts(value = "") {
+    const str = String(value);
+
+    if (str.includes("::")) {
+        const [left, ...rest] = str.split("::");
+        return {
+            header: left || str,
+            functionName: rest.join("::") || left || str,
+        };
+    }
+
+    if (str.includes("/")) {
+        const parts = str.split("/");
+        const filename = parts[parts.length - 1] || str;
+        return {
+            header: filename,
+            functionName: filename,
+        };
+    }
+
+    return { header: str, functionName: str };
 }
 
 function formatUs(value) {
