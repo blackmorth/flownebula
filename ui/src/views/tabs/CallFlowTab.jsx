@@ -57,13 +57,15 @@ export default function CallFlowTab({ payload }) {
             <Box
                 flex="0 0 44%"
                 borderWidth="1px"
-                borderRadius="md"
-                bg="white"
+                borderColor="border"
+                borderRadius="xl"
+                bg="bg.panel"
+                boxShadow="glow"
                 overflow="auto"
                 p={2}
             >
                 <Table.Root size="sm" variant="outline">
-                    <Table.Header position="sticky" top={0} bg="gray.50" zIndex={1}>
+                    <Table.Header position="sticky" top={0} bg="bg.subtle" zIndex={1}>
                         <Table.Row>
                             <Table.ColumnHeader w="34px" />
                             <Table.ColumnHeader>Node</Table.ColumnHeader>
@@ -97,8 +99,10 @@ export default function CallFlowTab({ payload }) {
             <Box
                 flex="1"
                 borderWidth="1px"
-                borderRadius="md"
-                bg="white"
+                borderColor="border"
+                borderRadius="xl"
+                bg="bg.panel"
+                boxShadow="glow"
                 overflow="auto"
                 p={2}
             >
@@ -113,8 +117,9 @@ function FragmentRow({ row, relation, expanded, selected, onToggle, onSelect }) 
         <>
             <Table.Row
                 className="function-overview tableinfo-focus"
-                bg={selected ? "purple.50" : "transparent"}
-                _hover={{ bg: "gray.50", cursor: "pointer" }}
+                bg={selected ? "nebula.100" : "transparent"}
+                color={selected ? "nebula.500" : "text"}
+                _hover={{ bg: "bg.subtle", cursor: "pointer" }}
                 onClick={onSelect}
             >
                 <Table.Cell onClick={(event) => {
@@ -138,7 +143,7 @@ function FragmentRow({ row, relation, expanded, selected, onToggle, onSelect }) 
             {expanded && (
                 <Table.Row className="function-info" name={row.id}>
                     <Table.Cell colSpan={5}>
-                        <Box p={3} borderRadius="md" bg="gray.50">
+                        <Box p={3} borderRadius="lg" bg="bg.subtle" borderWidth="1px" borderColor="border">
                             <Text fontWeight="semibold" mb={2}>{row.label}</Text>
 
                             <Flex gap={4} wrap="wrap" mb={3}>
@@ -190,8 +195,8 @@ function FragmentRow({ row, relation, expanded, selected, onToggle, onSelect }) 
 
 function SummaryBadge({ title, value }) {
     return (
-        <Box borderWidth="1px" borderColor="gray.200" borderRadius="md" px={3} py={2} minW="140px">
-            <Text fontSize="xs" color="gray.600">{title}</Text>
+        <Box borderWidth="1px" borderColor="border" borderRadius="md" px={3} py={2} minW="140px" bg="bg.panel">
+            <Text fontSize="xs" color="text.muted">{title}</Text>
             <Text fontSize="sm" fontWeight="semibold">{value}</Text>
         </Box>
     );
@@ -201,9 +206,9 @@ function MetricBar({ primary, secondary, value }) {
     return (
         <Box>
             <Text>{value}</Text>
-            <Box className="bf-progress bf-progress-dim-wt" position="relative" h="6px" borderRadius="sm" overflow="hidden" bg="gray.100" mt={1}>
-                <Box className="bf-progress-bar bf-progress-bar-secondary" position="absolute" inset={0} w={`${secondary}%`} bg="purple.200" />
-                <Box className="bf-progress-bar bf-progress-bar-primary" position="absolute" inset={0} w={`${primary}%`} bg="purple.500" />
+            <Box className="bf-progress bf-progress-dim-wt" position="relative" h="6px" borderRadius="sm" overflow="hidden" bg="bg.subtle" mt={1}>
+                <Box className="bf-progress-bar bf-progress-bar-secondary" position="absolute" inset={0} w={`${secondary}%`} bg="nebula.200" />
+                <Box className="bf-progress-bar bf-progress-bar-primary" position="absolute" inset={0} w={`${primary}%`} bg="nebula.400" />
             </Box>
         </Box>
     );
