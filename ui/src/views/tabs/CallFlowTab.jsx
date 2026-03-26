@@ -48,6 +48,7 @@ export default function CallFlowTab({ payload }) {
             .fit(true)
             .renderDot(dot)
             .on("end", () => {
+                normalizeSvgCanvas(ref.current);
                 highlightSelectedSvgNode(ref.current, selectedNodeId);
             });
     }, [payload, selectedNodeId, rows, graphSize]);
@@ -364,6 +365,24 @@ function highlightSelectedSvgNode(container, selectedNodeId) {
     });
 }
 
+function normalizeSvgCanvas(container) {
+    const svg = container?.querySelector("svg");
+    if (!svg) return;
+
+    svg.setAttribute("id", "graph_svg");
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+    svg.setAttribute("class", "graphviz");
+    svg.style.width = "100%";
+    svg.style.height = "100%";
+    svg.style.cursor = "default";
+
+    const mainGroup = svg.querySelector("g");
+    if (mainGroup) {
+        mainGroup.setAttribute("id", "graph_svg_group");
+    }
+}
+
 function shortName(value = "") {
     const str = String(value);
     return str.length > 28 ? `${str.slice(0, 28)}…` : str;
@@ -409,12 +428,14 @@ function escapeHtml(value = "") {
 function buildHtmlNodeLabel({ header, functionName, percentage, selected, root }) {
     const borderColor = selected ? "#6b46c1" : root ? "#1e293b" : "#334155";
     const background = selected ? "#efe7ff" : root ? "#e2e8f0" : "#f8fafc";
+    const accent = selected ? "#6b46c1" : "#8A4DFF";
 
     return `
-<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" COLOR="${borderColor}" BGCOLOR="${background}">
-    <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
-    <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
-    <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
+<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" COLOR="${borderColor}" BGCOLOR="${background}" FIXEDSIZE="TRUE" WIDTH="260">
+    <TR><TD ALIGN="LEFT" BGCOLOR="${accent}" HEIGHT="4"></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="8"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="8"><FONT POINT-SIZE="13"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="8"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
 </TABLE>`;
 }
 
