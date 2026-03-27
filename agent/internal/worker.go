@@ -25,13 +25,41 @@ var BufferPool = sync.Pool{
 const NumShards = 32
 
 func StartWorkers(workers int, eventChan <-chan Packet) {
-	for i := 0; i < workers; i++ {
+	if workers <= 1 {
 		go func() {
 			for p := range eventChan {
 				ProcessPacket(p)
 			}
 		}()
+		return
 	}
+
+	workerQueues := make([]chan Packet, workers)
+	for i := 0; i < workers; i++ {
+		workerQueues[i] = make(chan Packet, 1024)
+		go func(queue <-chan Packet) {
+			for p := range queue {
+				ProcessPacket(p)
+			}
+		}(workerQueues[i])
+	}
+
+	// Keep packet order per session by routing all packets for a given session ID
+	// to the same worker queue.
+	go func() {
+		var rr uint64
+		for p := range eventChan {
+			idx := 0
+			if p.N >= SessionIDSize {
+				sessID := binary.LittleEndian.Uint64(p.Data[:SessionIDSize])
+				idx = int(sessID % uint64(workers))
+			} else {
+				idx = int(rr % uint64(workers))
+				rr++
+			}
+			workerQueues[idx] <- p
+		}
+	}()
 }
 
 func ProcessPacket(p Packet) {
