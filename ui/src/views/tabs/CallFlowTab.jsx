@@ -309,7 +309,7 @@ function buildDot(payload, selectedNodeId) {
 digraph CallFlow {
     graph [rankdir=TB, splines=true, overlap=false, nodesep=0.4, ranksep=0.8, pad=0.2, bgcolor="#ffffff"];
     node [shape=plain, style="filled", penwidth=1.2, fontname="Inter", fontsize=11, margin="0.06,0.04", fillcolor="#f8fafc", color="#334155", fontcolor="#0f172a", class="profile-node"];
-    edge [fontname="Inter", fontsize=10, color="#64748b", fontcolor="#334155", arrowsize=0.75, labeldistance=1.5, labelfloat=false];
+    edge [fontname="Inter", fontsize=10, color="#64748b", fontcolor="#334155", arrowsize=0.7, labeldistance=2.2, labelangle=28, labelfloat=true];
 `;
 
     Object.values(nodes).forEach((n) => {
@@ -337,10 +337,13 @@ digraph CallFlow {
         const wt = e.cost?.wt || 0;
 
         const label = `${formatCount(ct)}x`;
+        const executionTime = formatUs(wt);
         const penwidth = 1.2 + (ct / maxCt) * 4.2;
         const stroke = interpolateHex("#94a3b8", "#1e293b", wt / maxWt);
 
-        dot += `    "${escapeDot(e.caller)}" -> "${escapeDot(e.callee)}" [label="${label}", penwidth=${penwidth.toFixed(2)}, color="${stroke}"];\n`;
+        dot += `    "${escapeDot(e.caller)}" -> "${escapeDot(e.callee)}" [label="${label}", labeltooltip="${executionTime}", tooltip="${executionTime}", edgetooltip="${executionTime}", penwidth=${penwidth.toFixed(
+            2
+        )}, color="${stroke}"];\n`;
     });
 
     dot += "}\n";
@@ -431,11 +434,11 @@ function buildHtmlNodeLabel({ header, functionName, percentage, selected, root }
     const accent = selected ? "#6b46c1" : "#8A4DFF";
 
     return `
-<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" COLOR="${borderColor}" BGCOLOR="${background}" FIXEDSIZE="TRUE" WIDTH="260">
+<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" COLOR="${borderColor}" BGCOLOR="${background}" FIXEDSIZE="TRUE" WIDTH="220">
     <TR><TD ALIGN="LEFT" BGCOLOR="${accent}" HEIGHT="4"></TD></TR>
-    <TR><TD ALIGN="LEFT" CELLPADDING="8"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
-    <TR><TD ALIGN="LEFT" CELLPADDING="8"><FONT POINT-SIZE="13"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
-    <TR><TD ALIGN="LEFT" CELLPADDING="8"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="12"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
 </TABLE>`;
 }
 
