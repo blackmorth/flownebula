@@ -2,7 +2,6 @@ package internal
 
 import (
 	"encoding/binary"
-	"log"
 	"net"
 	"sync"
 )
@@ -103,10 +102,7 @@ func ListenUnixgram(conn *net.UnixConn, eventChan chan<- Packet) {
 	for {
 		buf := BufferPool.Get().([]byte)
 		n, _, err := conn.ReadFromUnix(buf)
-		log.Printf("Received %d bytes", n)
-		log.Printf("Raw packet: %x", buf[:n])
 		if err != nil {
-			log.Printf("ReadFromUnix error: %v", err)
 			BufferPool.Put(buf)
 			continue
 		}
@@ -114,10 +110,7 @@ func ListenUnixgram(conn *net.UnixConn, eventChan chan<- Packet) {
 			BufferPool.Put(buf)
 			continue
 		}
-		select {
-		case eventChan <- Packet{Data: buf, N: n}:
-		default:
-			BufferPool.Put(buf)
-		}
+		// Do not drop profile packets: preserve accuracy over best-effort delivery.
+		eventChan <- Packet{Data: buf, N: n}
 	}
 }
