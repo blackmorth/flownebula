@@ -316,11 +316,13 @@ digraph CallFlow {
         const isRoot = n.nodeId === root;
         const isSelected = n.nodeId === selectedNodeId;
         const wtPct = n.inclusive_percentage?.wt || 0;
+        const exclusivePct = n.exclusive_percentage?.wt || 0;
         const { header, functionName } = nodeLabelParts(n);
         const label = buildHtmlNodeLabel({
             header: shortName(header),
             functionName: shortName(functionName),
-            percentage: `${wtPct.toFixed(2)}%`,
+            percentage: `${wtPct.toFixed(2)}% incl.`,
+            exclusivePercentage: `${exclusivePct.toFixed(2)}% excl.`,
             selected: isSelected,
             root: isRoot,
         });
@@ -428,7 +430,7 @@ function escapeHtml(value = "") {
         .replace(/'/g, "&#39;");
 }
 
-function buildHtmlNodeLabel({ header, functionName, percentage, selected, root }) {
+function buildHtmlNodeLabel({ header, functionName, percentage, exclusivePercentage, selected, root }) {
     const borderColor = selected ? "#6b46c1" : root ? "#1e293b" : "#334155";
     const background = selected ? "#efe7ff" : root ? "#e2e8f0" : "#f8fafc";
     const accent = selected ? "#6b46c1" : "#8A4DFF";
@@ -439,6 +441,7 @@ function buildHtmlNodeLabel({ header, functionName, percentage, selected, root }
     <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
     <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="12"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
     <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(exclusivePercentage)}</FONT></TD></TR>
 </TABLE>`;
 }
 
