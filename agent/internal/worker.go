@@ -2,7 +2,6 @@ package internal
 
 import (
 	"encoding/binary"
-	"log"
 	"net"
 	"sync"
 )
@@ -25,13 +24,41 @@ var BufferPool = sync.Pool{
 const NumShards = 32
 
 func StartWorkers(workers int, eventChan <-chan Packet) {
-	for i := 0; i < workers; i++ {
+	if workers <= 1 {
 		go func() {
 			for p := range eventChan {
 				ProcessPacket(p)
 			}
 		}()
+		return
 	}
+
+	workerQueues := make([]chan Packet, workers)
+	for i := 0; i < workers; i++ {
+		workerQueues[i] = make(chan Packet, 1024)
+		go func(queue <-chan Packet) {
+			for p := range queue {
+				ProcessPacket(p)
+			}
+		}(workerQueues[i])
+	}
+
+	// Keep packet order per session by routing all packets for a given session ID
+	// to the same worker queue.
+	go func() {
+		var rr uint64
+		for p := range eventChan {
+			idx := 0
+			if p.N >= SessionIDSize {
+				sessID := binary.LittleEndian.Uint64(p.Data[:SessionIDSize])
+				idx = int(sessID % uint64(workers))
+			} else {
+				idx = int(rr % uint64(workers))
+				rr++
+			}
+			workerQueues[idx] <- p
+		}
+	}()
 }
 
 func ProcessPacket(p Packet) {
@@ -75,10 +102,7 @@ func ListenUnixgram(conn *net.UnixConn, eventChan chan<- Packet) {
 	for {
 		buf := BufferPool.Get().([]byte)
 		n, _, err := conn.ReadFromUnix(buf)
-		log.Printf("Received %d bytes", n)
-		log.Printf("Raw packet: %x", buf[:n])
 		if err != nil {
-			log.Printf("ReadFromUnix error: %v", err)
 			BufferPool.Put(buf)
 			continue
 		}
@@ -86,10 +110,7 @@ func ListenUnixgram(conn *net.UnixConn, eventChan chan<- Packet) {
 			BufferPool.Put(buf)
 			continue
 		}
-		select {
-		case eventChan <- Packet{Data: buf, N: n}:
-		default:
-			BufferPool.Put(buf)
-		}
+		// Do not drop profile packets: preserve accuracy over best-effort delivery.
+		eventChan <- Packet{Data: buf, N: n}
 	}
 }

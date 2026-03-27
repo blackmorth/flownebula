@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+func nsToUS(v uint64) int64 {
+	// Probe timings are emitted in nanoseconds. The UI and exported payload
+	// expect microseconds for wall/cpu timing dimensions.
+	return int64((v + 500) / 1000)
+}
+
 func GetFuncName(id uint32) string {
 	if id == 0 {
 		return "{invalid}"
@@ -126,12 +132,12 @@ func (s *Session) AddEvent(ev CallEvent) {
 
 		_ = s.Pop()
 		node.Metrics["ct"]++
-		node.Metrics["wt"] += int64(ev.Inclusive)
-		node.Metrics["ewt"] += int64(ev.Exclusive)
-		node.Metrics["cpu"] += int64(ev.CPUTime)
+		node.Metrics["wt"] += nsToUS(ev.Inclusive)
+		node.Metrics["ewt"] += nsToUS(ev.Exclusive)
+		node.Metrics["cpu"] += nsToUS(ev.CPUTime)
 		node.Metrics["mu"] += ev.MemDelta
-		node.Metrics["io"] += int64(ev.IOWait)
-		node.Metrics["nw"] += int64(ev.Network)
+		node.Metrics["io"] += nsToUS(ev.IOWait)
+		node.Metrics["nw"] += nsToUS(ev.Network)
 		if int64(ev.PeakMemory) > node.Metrics["pmu"] {
 			node.Metrics["pmu"] = int64(ev.PeakMemory)
 		}
