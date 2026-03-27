@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <errno.h>
 
 void generate_session_id(char out[SESSION_ID_SIZE])
 {
@@ -25,8 +26,9 @@ void send_func_name(uint32_t func_id, const char *name)
     pkg.func_id    = func_id;
     pkg.name_len   = (uint32_t)name_len;
     memcpy(pkg.name, name, name_len);
-    sendto(NEBULA_G(socket_fd), &pkg, 17 + name_len, MSG_DONTWAIT,
-           (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
+    // Prefer reliability over non-blocking loss for short metadata packets.
+    (void)sendto(NEBULA_G(socket_fd), &pkg, 17 + name_len, 0,
+                 (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
 }
 
 uint32_t get_func_id(const zend_function *func)
@@ -148,9 +150,15 @@ void flush_buffer(void)
     while (sent < n) {
         uint32_t to_send = n - sent;
         if (to_send > NEBULA_BATCH_SIZE) to_send = NEBULA_BATCH_SIZE;
-        ssize_t res = sendto(NEBULA_G(socket_fd), &NEBULA_G(buffer)[sent], to_send * sizeof(nebula_event_t),
-                             MSG_DONTWAIT, (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
+        size_t payload_size = to_send * sizeof(nebula_event_t);
+        ssize_t res;
+        do {
+            res = sendto(NEBULA_G(socket_fd), &NEBULA_G(buffer)[sent], payload_size,
+                         0, (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
+        } while (res < 0 && errno == EINTR);
+
         if (res < 0) break;
+        if ((size_t)res != payload_size) break;
         sent += to_send;
     }
     atomic_store(&NEBULA_G(write_pos), 0);
