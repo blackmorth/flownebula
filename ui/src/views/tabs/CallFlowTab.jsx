@@ -316,13 +316,11 @@ digraph CallFlow {
         const isRoot = n.nodeId === root;
         const isSelected = n.nodeId === selectedNodeId;
         const wtPct = n.inclusive_percentage?.wt || 0;
-        const exclusivePct = n.exclusive_percentage?.wt || 0;
         const { header, functionName } = nodeLabelParts(n);
         const label = buildHtmlNodeLabel({
             header: shortName(header),
             functionName: shortName(functionName),
             percentage: `${wtPct.toFixed(2)}% incl.`,
-            exclusivePercentage: `${exclusivePct.toFixed(2)}% excl.`,
             selected: isSelected,
             root: isRoot,
         });
@@ -400,9 +398,11 @@ function nodeLabelParts(node) {
 
     if (str.includes("::")) {
         const [left, ...rest] = str.split("::");
+        const method = rest.join("::");
+        const computedFunction = explicitName && explicitName !== nodeId ? explicitName : method;
         return {
             header: left || str,
-            functionName: explicitName && explicitName !== nodeId ? explicitName : (rest.join("::") || left || str),
+            functionName: computedFunction && computedFunction !== (left || str) ? computedFunction : "",
         };
     }
 
@@ -417,7 +417,7 @@ function nodeLabelParts(node) {
 
     return {
         header: str,
-        functionName: explicitName && explicitName !== nodeId ? explicitName : str,
+        functionName: explicitName && explicitName !== nodeId ? explicitName : "",
     };
 }
 
@@ -430,18 +430,17 @@ function escapeHtml(value = "") {
         .replace(/'/g, "&#39;");
 }
 
-function buildHtmlNodeLabel({ header, functionName, percentage, exclusivePercentage, selected, root }) {
+function buildHtmlNodeLabel({ header, functionName, percentage, selected, root }) {
     const borderColor = selected ? "#6b46c1" : root ? "#1e293b" : "#334155";
     const background = selected ? "#efe7ff" : root ? "#e2e8f0" : "#f8fafc";
     const accent = selected ? "#6b46c1" : "#8A4DFF";
 
     return `
-<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" COLOR="${borderColor}" BGCOLOR="${background}" FIXEDSIZE="TRUE" WIDTH="220">
+<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" COLOR="${borderColor}" BGCOLOR="${background}" FIXEDSIZE="TRUE" WIDTH="200">
     <TR><TD ALIGN="LEFT" BGCOLOR="${accent}" HEIGHT="4"></TD></TR>
     <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(header)}</FONT></TD></TR>
-    <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="12"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>
+    ${functionName ? `<TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="12"><B>${escapeHtml(functionName)}</B></FONT></TD></TR>` : ""}
     <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="11" COLOR="#0f172a">${escapeHtml(percentage)}</FONT></TD></TR>
-    <TR><TD ALIGN="LEFT" CELLPADDING="6"><FONT POINT-SIZE="10" COLOR="#64748b">${escapeHtml(exclusivePercentage)}</FONT></TD></TR>
 </TABLE>`;
 }
 
