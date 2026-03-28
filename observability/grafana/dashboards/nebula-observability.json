@@ -1,0 +1,52 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Probe Packets (agent ingest)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "rate(nebula_probe_event_packets_total[1m])", "legendFormat": "events/s"},
+        {"expr": "rate(nebula_probe_name_packets_total[1m])", "legendFormat": "names/s"},
+        {"expr": "rate(nebula_probe_session_end_total[1m])", "legendFormat": "session_end/s"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent Reliability",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "rate(nebula_ingest_rate_total[1m])", "legendFormat": "ingest/s"},
+        {"expr": "rate(nebula_validation_errors_total[1m])", "legendFormat": "validation errors/s"},
+        {"expr": "rate(nebula_send_failures_total[1m])", "legendFormat": "send failures/s"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Server Upload Health",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {"expr": "rate(nebula_server_agent_uploads_total[1m])", "legendFormat": "uploads/s"},
+        {"expr": "rate(nebula_server_agent_upload_errors_total[1m])", "legendFormat": "upload errors/s"},
+        {"expr": "rate(nebula_server_protocol_rejects_total[1m])", "legendFormat": "protocol rejects/s"}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Agent Queue Depth",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"expr": "nebula_queue_depth", "legendFormat": "queue"}
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["nebula", "agent", "server"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "title": "Nebula Observability",
+  "version": 1
+}

@@ -22,6 +22,7 @@ const (
 	EventExit       = 1
 	EventFuncName   = 255
 	EventSessionEnd = 254
+	ProtocolVersion = 1
 	SessionIDSize   = 8
 	NameHeaderSize  = 17 // 8 (SID) + 1 (Type) + 4 (ID) + 4 (Len)
 	EventSize       = 8 + 1 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 8
@@ -58,7 +59,7 @@ type DetailedJSON struct {
 	Comparison     bool                 `json:"comparison"`
 	Peaks          Peaks                `json:"peaks"`
 	Language       string               `json:"language"`
-	Protocol       int                  `json:"protocol_version,omitempty"`
+	Protocol       int                  `json:"protocol_version"`
 	DroppedEvents  uint64               `json:"dropped_events,omitempty"`
 }
 

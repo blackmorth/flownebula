@@ -6,10 +6,10 @@ import (
 )
 
 func main() {
-	app := api.New()
+	app, cfg := api.New()
 
-	log.Println("Nebula server running on :8080")
-	if err := app.Listen(":8080"); err != nil {
+	log.Printf("Nebula server running on %s (metrics: %s)", cfg.ServerListenAddr, cfg.ServerMetricsAddr)
+	if err := app.Listen(cfg.ServerListenAddr); err != nil {
 		log.Fatal(err)
 	}
 }

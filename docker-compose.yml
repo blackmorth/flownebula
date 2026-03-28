@@ -3,9 +3,13 @@ services:
     build:
       context: ./agent
       dockerfile: ../docker/Dockerfile.agent
+    command:
+      - -metrics-addr=:9108
     volumes:
       - nebula-sock:/var/run
       - nebula-bin:/opt/nebula
+    ports:
+      - "9108:9108"
     restart: always
 
   php:
@@ -26,7 +30,9 @@ services:
       dockerfile: ../docker/Dockerfile.server
     ports:
       - "8080:8080"
-
+      - "9109:9109"
+    environment:
+      SERVER_METRICS_ADDR: ":9109"
     restart: unless-stopped
   ui:
     build:
@@ -36,6 +42,31 @@ services:
       - "8081:80"
     #depends_on:
      # - server
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - agent
+      - server
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
 
 volumes:
   nebula-sock:

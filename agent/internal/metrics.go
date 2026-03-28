@@ -58,6 +58,9 @@ type AgentMetricsRegistry struct {
 	ValidateProcessed  counter
 	ValidationErrors   counter
 	AggregateProcessed counter
+	ProbeEventPackets  counter
+	ProbeNamePackets   counter
+	ProbeSessionEnds   counter
 	Drops              counter
 	QueueDepth         gauge
 	FlushLatency       *histogram
@@ -86,6 +89,9 @@ func StartMetricsServer(addr string) {
 		fmt.Fprintf(w, "# TYPE nebula_validation_errors_total counter\nnebula_validation_errors_total %d\n", AgentMetrics.ValidationErrors.Load())
 		fmt.Fprintf(w, "# HELP nebula_aggregate_processed_total Total events aggregated into sessions.\n")
 		fmt.Fprintf(w, "# TYPE nebula_aggregate_processed_total counter\nnebula_aggregate_processed_total %d\n", AgentMetrics.AggregateProcessed.Load())
+		fmt.Fprintf(w, "# TYPE nebula_probe_event_packets_total counter\nnebula_probe_event_packets_total %d\n", AgentMetrics.ProbeEventPackets.Load())
+		fmt.Fprintf(w, "# TYPE nebula_probe_name_packets_total counter\nnebula_probe_name_packets_total %d\n", AgentMetrics.ProbeNamePackets.Load())
+		fmt.Fprintf(w, "# TYPE nebula_probe_session_end_total counter\nnebula_probe_session_end_total %d\n", AgentMetrics.ProbeSessionEnds.Load())
 		fmt.Fprintf(w, "# HELP nebula_drops_total Total packets dropped by backpressure policy.\n")
 		fmt.Fprintf(w, "# TYPE nebula_drops_total counter\nnebula_drops_total %d\n", AgentMetrics.Drops.Load())
 		fmt.Fprintf(w, "# HELP nebula_queue_depth Current ingest queue depth.\n")

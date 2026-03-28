@@ -65,6 +65,7 @@ func GetSession(id uint64) *Session {
 		stack:       []*Node{},
 		LastSeen:    now,
 		LastEventAt: now,
+		Protocol:    ProtocolVersion,
 	}
 	shard.Sessions[id] = s
 	return s

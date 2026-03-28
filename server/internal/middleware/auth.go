@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"flownebula/server/internal/metrics"
 	"strings"
 
 	"flownebula/server/internal/auth"
@@ -10,8 +11,10 @@ import (
 
 func JWTProtected() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		metrics.ServerMetrics.HTTPRequestsTotal.Add(1)
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
+			metrics.ServerMetrics.HTTPUnauthorizedTotal.Add(1)
 			addCORSHeaders(c)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "missing Authorization header",
@@ -20,6 +23,7 @@ func JWTProtected() fiber.Handler {
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
+			metrics.ServerMetrics.HTTPUnauthorizedTotal.Add(1)
 			addCORSHeaders(c)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "invalid Authorization header",
@@ -30,6 +34,7 @@ func JWTProtected() fiber.Handler {
 
 		claims, err := auth.ParseToken(tokenStr)
 		if err != nil {
+			metrics.ServerMetrics.HTTPUnauthorizedTotal.Add(1)
 			addCORSHeaders(c)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "invalid or expired token",

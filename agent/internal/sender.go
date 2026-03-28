@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,59 +20,32 @@ type Sender struct {
 	jwt       string
 	client    *http.Client
 	walPath   string
-	breaker   *circuitBreaker
+	opts      SenderOptions
 }
 
-type circuitBreaker struct {
-	mu           sync.Mutex
-	failures     int
-	threshold    int
-	openUntil    time.Time
-	openDuration time.Duration
-}
-
-func newCircuitBreaker(threshold int, openDuration time.Duration) *circuitBreaker {
-	return &circuitBreaker{threshold: threshold, openDuration: openDuration}
-}
-
-func (cb *circuitBreaker) allow() bool {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	if time.Now().Before(cb.openUntil) {
-		return false
-	}
-	return true
-}
-
-func (cb *circuitBreaker) recordFailure() {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	cb.failures++
-	if cb.failures >= cb.threshold {
-		cb.openUntil = time.Now().Add(cb.openDuration)
-		cb.failures = 0
-	}
-}
-
-func (cb *circuitBreaker) recordSuccess() {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	cb.failures = 0
-	cb.openUntil = time.Time{}
+type SenderOptions struct {
+	MaxRetries       int
+	InitialBackoffMs int
 }
 
 // GlobalSender is the package-level sender, set at startup.
 var GlobalSender *Sender
 
 // NewSender authenticates against the server using the agent token and returns a ready Sender.
-func NewSender(serverURL, agentToken, walPath string) (*Sender, error) {
+func NewSender(serverURL, agentToken, walPath string, opts SenderOptions) (*Sender, error) {
+	if opts.MaxRetries <= 0 {
+		opts.MaxRetries = 3
+	}
+	if opts.InitialBackoffMs <= 0 {
+		opts.InitialBackoffMs = 500
+	}
 	s := &Sender{
 		serverURL: serverURL,
 		client:    &http.Client{Timeout: 10 * time.Second},
 		walPath:   walPath,
-		breaker:   newCircuitBreaker(5, 30*time.Second),
+		opts:      opts,
 	}
-	if err := s.login(agentToken); err != nil {
+	if err := s.loginWithRetry(agentToken); err != nil {
 		return nil, err
 	}
 	if walPath != "" {
@@ -83,6 +55,26 @@ func NewSender(serverURL, agentToken, walPath string) (*Sender, error) {
 	}
 	go s.replayWALLoop()
 	return s, nil
+}
+
+func (s *Sender) loginWithRetry(agentToken string) error {
+	var lastErr error
+	backoff := time.Duration(s.opts.InitialBackoffMs) * time.Millisecond
+	for attempt := 1; attempt <= s.opts.MaxRetries; attempt++ {
+		if attempt > 1 {
+			AgentMetrics.RetryAttempts.Add(1)
+			time.Sleep(backoff)
+			if backoff < 5*time.Second {
+				backoff *= 2
+			}
+		}
+		if err := s.login(agentToken); err != nil {
+			lastErr = err
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("agent login failed after retries: %w", lastErr)
 }
 
 func (s *Sender) login(agentToken string) error {
@@ -116,19 +108,10 @@ func (s *Sender) login(agentToken string) error {
 }
 
 func (s *Sender) SendSession(payload []byte) error {
-	if !s.breaker.allow() {
-		if err := s.appendToWAL(payload); err != nil {
-			return err
-		}
-		return errors.New("circuit breaker open; payload queued to WAL")
-	}
-
-	err := s.sendWithRetry(payload, 5)
+	err := s.sendWithRetry(payload, s.opts.MaxRetries)
 	if err == nil {
-		s.breaker.recordSuccess()
 		return nil
 	}
-	s.breaker.recordFailure()
 	if walErr := s.appendToWAL(payload); walErr != nil {
 		return fmt.Errorf("send failed: %w (WAL append failed: %v)", err, walErr)
 	}
@@ -138,7 +121,7 @@ func (s *Sender) SendSession(payload []byte) error {
 
 func (s *Sender) sendWithRetry(payload []byte, maxAttempts int) error {
 	var lastErr error
-	backoff := 500 * time.Millisecond
+	backoff := time.Duration(s.opts.InitialBackoffMs) * time.Millisecond
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if attempt > 1 {
 			AgentMetrics.RetryAttempts.Add(1)
@@ -154,7 +137,7 @@ func (s *Sender) sendWithRetry(payload []byte, maxAttempts int) error {
 		return nil
 	}
 	if lastErr == nil {
-		lastErr = errors.New("upload failed without details")
+		lastErr = fmt.Errorf("upload failed without details")
 	}
 	return lastErr
 }
@@ -228,7 +211,7 @@ func (s *Sender) replayWALOnce() {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
-		if err := s.sendWithRetry(line, 3); err != nil {
+		if err := s.sendWithRetry(line, s.opts.MaxRetries); err != nil {
 			remaining = append(remaining, line)
 			continue
 		}
