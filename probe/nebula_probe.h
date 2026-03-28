@@ -33,6 +33,7 @@ typedef struct frame_t {
 ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     zend_bool enabled;
     uint64_t  threshold_ns;
+    double    sample_rate;
     int       depth;
     frame_t   stack[NEBULA_STACK_SIZE];
     nebula_event_t       buffer[NEBULA_RING_SIZE];
@@ -79,6 +80,7 @@ void send_func_name(uint32_t func_id, const char *name);
 void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive, uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network);
 void flush_buffer(void);
 void nebula_send_session_end(unsigned char *session_id);
+zend_bool nebula_should_sample(uint32_t func_id, uint64_t start_time);
 
 /* Hooks */
 extern void (*old_execute_ex)(zend_execute_data *execute_data);

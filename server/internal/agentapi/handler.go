@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"flownebula/server/internal/metrics"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/datatypes"
 )
@@ -51,6 +52,7 @@ func (h *Handler) Heartbeat(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UploadSession(c *fiber.Ctx) error {
+	metrics.ServerMetrics.AgentUploadsTotal.Add(1)
 	var userID int64 = 0
 	if v := c.Locals("user_id"); v != nil {
 		if id, ok := v.(int64); ok {
@@ -60,8 +62,26 @@ func (h *Handler) UploadSession(c *fiber.Ctx) error {
 
 	var payload map[string]interface{}
 	if err := c.BodyParser(&payload); err != nil {
-		log.Printf("[UPLOAD] invalid JSON body: %v", err)
+		log.Printf("[UPLOAD] invalid JSON body")
+		metrics.ServerMetrics.AgentUploadErrorsTotal.Add(1)
 		return fiber.ErrBadRequest
+	}
+
+	rawVersion, ok := payload["protocol_version"]
+	if !ok {
+		metrics.ServerMetrics.ProtocolRejectsTotal.Add(1)
+		metrics.ServerMetrics.AgentUploadErrorsTotal.Add(1)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "protocol_version required",
+		})
+	}
+	versionFloat, ok := rawVersion.(float64)
+	if !ok || int(versionFloat) != 1 {
+		metrics.ServerMetrics.ProtocolRejectsTotal.Add(1)
+		metrics.ServerMetrics.AgentUploadErrorsTotal.Add(1)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "unsupported protocol_version",
+		})
 	}
 
 	agentSessionID := ""
@@ -107,13 +127,14 @@ func (h *Handler) UploadSession(c *fiber.Ctx) error {
 	}
 
 	if err := h.sessions.Create(session); err != nil {
-		log.Printf("[UPLOAD] DB error: %v", err)
+		log.Printf("[UPLOAD] DB error")
+		metrics.ServerMetrics.AgentUploadErrorsTotal.Add(1)
 		return c.Status(500).JSON(fiber.Map{
 			"error": "failed to store session",
 		})
 	}
 
-	log.Printf("[UPLOAD] stored session=%d user_id=%d agent_id=%s payload_bytes=%d", session.ID, userID, agentID, len(jsonBytes))
+	log.Printf("[UPLOAD] stored session=%d user_id=%d payload_bytes=%d", session.ID, userID, len(jsonBytes))
 
 	return c.Status(201).JSON(fiber.Map{
 		"session_id": session.ID,

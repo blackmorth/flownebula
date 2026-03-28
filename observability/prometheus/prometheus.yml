@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: nebula-agent
+    static_configs:
+      - targets: ['agent:9108']
+
+  - job_name: nebula-server
+    static_configs:
+      - targets: ['server:9109']

@@ -18,6 +18,8 @@ PHP_INI_BEGIN()
                       enabled, zend_nebula_probe_globals, nebula_probe_globals)
     STD_PHP_INI_ENTRY("nebula_probe.threshold_ns", "0",    PHP_INI_ALL, OnUpdateLong,
                       threshold_ns, zend_nebula_probe_globals, nebula_probe_globals)
+    STD_PHP_INI_ENTRY("nebula_probe.sample_rate",  "1.0",  PHP_INI_ALL, OnUpdateReal,
+                      sample_rate, zend_nebula_probe_globals, nebula_probe_globals)
 PHP_INI_END()
 
 PHP_MINIT_FUNCTION(nebula_probe)

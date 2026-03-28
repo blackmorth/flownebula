@@ -29,6 +29,8 @@ func main() {
 		highWatermark      = flag.Float64("queue-high-watermark", 0.9, "Queue fill ratio above which adaptive drop policy is enabled")
 		metricsAddr        = flag.String("metrics-addr", ":9108", "Address to expose Prometheus metrics (empty to disable)")
 		walPath            = flag.String("wal-path", "/var/lib/nebula-agent/session.wal", "Path to local append-only WAL for failed exports")
+		sendRetries        = flag.Int("send-retries", 3, "Number of retries for auth/session upload")
+		sendRetryBackoffMs = flag.Int("send-retry-backoff-ms", 500, "Initial retry backoff in milliseconds")
 	)
 	flag.Parse()
 
@@ -121,7 +123,10 @@ func main() {
 	log.Printf("Nebula Agent listening on %s", sockPath)
 
 	if *serverURL != "" && *agentToken != "" {
-		sender, err := internal.NewSender(*serverURL, *agentToken, *walPath)
+		sender, err := internal.NewSender(*serverURL, *agentToken, *walPath, internal.SenderOptions{
+			MaxRetries:       *sendRetries,
+			InitialBackoffMs: *sendRetryBackoffMs,
+		})
 		if err != nil {
 			log.Printf("Warning: failed to connect to server: %v", err)
 		} else {

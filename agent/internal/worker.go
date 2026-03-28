@@ -30,6 +30,8 @@ var (
 	ErrInvalidNamePacket    = errors.New("invalid function-name packet")
 	ErrInvalidEventPayload  = errors.New("event payload is not aligned to event size")
 	ErrUnknownProtocolEvent = errors.New("unknown event type")
+	ErrInvalidSessionEnd    = errors.New("invalid session-end packet")
+	ErrUnsupportedProtocol  = errors.New("unsupported protocol version")
 )
 
 func StartWorkers(workers int, eventChan <-chan Packet) {
@@ -83,6 +85,7 @@ func ProcessPacket(p Packet) {
 
 	// Special type for function names (255)
 	if len(data) >= NameHeaderSize && data[SessionIDSize] == EventFuncName {
+		AgentMetrics.ProbeNamePackets.Add(1)
 		funcID := binary.LittleEndian.Uint32(data[9:13])
 		nameLen := int(binary.LittleEndian.Uint32(data[13:17]))
 		name := string(data[NameHeaderSize : NameHeaderSize+nameLen])
@@ -95,6 +98,7 @@ func ProcessPacket(p Packet) {
 
 	for j := 0; j+EventSize <= len(data); j += EventSize {
 		d := data[j : j+EventSize]
+		AgentMetrics.ProbeEventPackets.Add(1)
 		sessID := binary.LittleEndian.Uint64(d[:SessionIDSize])
 
 		ev := CallEvent{
@@ -138,6 +142,17 @@ func validatePacket(data []byte) error {
 			e := data[j+SessionIDSize]
 			if e != EventEnter && e != EventExit && e != EventSessionEnd {
 				return ErrUnknownProtocolEvent
+			}
+			if e == EventSessionEnd {
+				funcID := binary.LittleEndian.Uint32(data[j+9 : j+13])
+				if funcID != 0 {
+					return ErrInvalidSessionEnd
+				}
+				version := binary.LittleEndian.Uint64(data[j+61 : j+69])
+				if version != ProtocolVersion {
+					return ErrUnsupportedProtocol
+				}
+				AgentMetrics.ProbeSessionEnds.Add(1)
 			}
 		}
 		return nil

@@ -56,7 +56,7 @@ void nebula_execute_ex(zend_execute_data *execute_data)
         parent->cpu_child_time += cpu_total;
     }
 
-    if (inclusive >= NEBULA_G(threshold_ns)) {
+    if (inclusive >= NEBULA_G(threshold_ns) && nebula_should_sample(func_id, f->start_time)) {
         if (!f->emitted) {
             emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
             f->emitted = 1;
@@ -115,7 +115,7 @@ void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value
         parent->cpu_child_time += cpu_total;
     }
 
-    if (inclusive >= NEBULA_G(threshold_ns)) {
+    if (inclusive >= NEBULA_G(threshold_ns) && nebula_should_sample(func_id, f->start_time)) {
         if (!f->emitted) {
             emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
             f->emitted = 1;

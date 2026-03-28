@@ -6,6 +6,23 @@
 #include <errno.h>
 #include <fcntl.h>
 
+zend_bool nebula_should_sample(uint32_t func_id, uint64_t start_time)
+{
+    double rate = NEBULA_G(sample_rate);
+    if (rate >= 1.0) return 1;
+    if (rate <= 0.0) return 0;
+
+    uint64_t mixed = start_time ^ ((uint64_t)func_id * 11400714819323198485ull);
+    mixed ^= mixed >> 33;
+    mixed *= 0xff51afd7ed558ccdull;
+    mixed ^= mixed >> 33;
+    mixed *= 0xc4ceb9fe1a85ec53ull;
+    mixed ^= mixed >> 33;
+
+    double normalized = (double)(mixed % 1000000u) / 1000000.0;
+    return normalized < rate;
+}
+
 void generate_session_id(char out[SESSION_ID_SIZE])
 {
     static _Atomic uint64_t counter = 0;

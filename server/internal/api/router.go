@@ -4,6 +4,7 @@ import (
 	"flownebula/server/internal/agentapi"
 	"flownebula/server/internal/auth"
 	"flownebula/server/internal/db"
+	"flownebula/server/internal/metrics"
 	"flownebula/server/internal/middleware"
 	"flownebula/server/internal/profiles"
 	"flownebula/server/internal/sessions"
@@ -14,15 +15,16 @@ import (
 	"log"
 )
 
-func New() *fiber.App {
+func New() (*fiber.App, Config) {
 	cfg := LoadConfig()
+	metrics.StartMetricsServer(cfg.ServerMetricsAddr)
 
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.CORSAllowOrigins,
-		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders:     "Content-Type, Authorization",
-		AllowCredentials: true,
+		AllowMethods:     cfg.CORSAllowMethods,
+		AllowHeaders:     cfg.CORSAllowHeaders,
+		AllowCredentials: cfg.CORSAllowCredentials,
 	}))
 
 	app.Options("/*", func(c *fiber.Ctx) error {
@@ -32,7 +34,7 @@ func New() *fiber.App {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
 	})
-	sqlite := db.Open("nebula.db")
+	sqlite := db.Open(cfg.DBPath)
 	db.Migrate(sqlite)
 	deleted, err := db.ApplyRetention(sqlite, cfg.SessionRetentionInDays)
 	if err != nil {
@@ -71,5 +73,5 @@ func New() *fiber.App {
 	agentapi.RegisterRoutes(agent, sessionRepo, agentUploadProtection...)
 	profiles.RegisterRoutes(agent, profilesRepo)
 
-	return app
+	return app, cfg
 }
