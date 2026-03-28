@@ -1,28 +1,7 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import buildTree from "../../utils/buildTree";
+import { formatDuration } from "../../utils/formatters";
 
-function formatDuration(ns) {
-    const value = Number.isFinite(ns) ? Math.max(ns, 0) : 0;
-
-    const units = [
-        { size: 3_600_000_000_000, label: "h" },
-        { size: 60_000_000_000, label: "m" },
-        { size: 1_000_000_000, label: "s" },
-        { size: 1_000_000, label: "ms" },
-        { size: 1_000, label: "µs" },
-    ];
-
-    for (const unit of units) {
-        if (value >= unit.size) {
-            return `${new Intl.NumberFormat("en-US", {
-                minimumFractionDigits: value >= unit.size * 10 ? 0 : 2,
-                maximumFractionDigits: 2,
-            }).format(value / unit.size)} ${unit.label}`;
-        }
-    }
-
-    return `${new Intl.NumberFormat("en-US").format(Math.round(value))} ns`;
-}
 
 function CallTree({ node, depth = 0, total = node.cost || 1 }) {
     const width = Math.max((node.cost / total) * 100, 1);
