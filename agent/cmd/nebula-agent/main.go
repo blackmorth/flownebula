@@ -18,12 +18,17 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Printf("Starting Nebula Agent...")
 	var (
-		daemon     = flag.Bool("daemon", false, "Run as daemon (background process)")
-		logFile    = flag.String("log", "", "Path to log file")
-		workers    = flag.Int("workers", 4, "Number of worker goroutines for event processing")
-		samplePID  = flag.Int("sample-pid", 0, "PID to CPU-sample with perf_event_open")
-		serverURL  = flag.String("server-url", "", "Nebula server URL (e.g. http://localhost:8080)")
-		agentToken = flag.String("agent-token", "", "Agent token for server authentication")
+		daemon             = flag.Bool("daemon", false, "Run as daemon (background process)")
+		logFile            = flag.String("log", "", "Path to log file")
+		workers            = flag.Int("workers", 4, "Number of worker goroutines for event processing")
+		samplePID          = flag.Int("sample-pid", 0, "PID to CPU-sample with perf_event_open")
+		serverURL          = flag.String("server-url", "", "Nebula server URL (e.g. http://localhost:8080)")
+		agentToken         = flag.String("agent-token", "", "Agent token for server authentication")
+		queueSize          = flag.Int("queue-size", 10000, "Size of ingest queue")
+		dropNewestWhenFull = flag.Bool("drop-newest-when-full", false, "Drop incoming packets instead of blocking when queue is full")
+		highWatermark      = flag.Float64("queue-high-watermark", 0.9, "Queue fill ratio above which adaptive drop policy is enabled")
+		metricsAddr        = flag.String("metrics-addr", ":9108", "Address to expose Prometheus metrics (empty to disable)")
+		walPath            = flag.String("wal-path", "/var/lib/nebula-agent/session.wal", "Path to local append-only WAL for failed exports")
 	)
 	flag.Parse()
 
@@ -116,7 +121,7 @@ func main() {
 	log.Printf("Nebula Agent listening on %s", sockPath)
 
 	if *serverURL != "" && *agentToken != "" {
-		sender, err := internal.NewSender(*serverURL, *agentToken)
+		sender, err := internal.NewSender(*serverURL, *agentToken, *walPath)
 		if err != nil {
 			log.Printf("Warning: failed to connect to server: %v", err)
 		} else {
@@ -125,13 +130,14 @@ func main() {
 		}
 	}
 
+	internal.StartMetricsServer(*metricsAddr)
 	go internal.ExportSessionsLoop()
 	go internal.CleanupSessions()
 
-	eventChan := make(chan internal.Packet, 10000)
+	eventChan := make(chan internal.Packet, *queueSize)
 	internal.StartWorkers(*workers, eventChan)
 
-	internal.ListenUnixgram(conn, eventChan)
+	internal.ListenUnixgram(conn, eventChan, *dropNewestWhenFull, *highWatermark)
 }
 
 func detectPHPUser() (int, int) {

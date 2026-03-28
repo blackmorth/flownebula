@@ -51,3 +51,23 @@ func TestProcessPacketAddsEventToSession(t *testing.T) {
 		t.Fatalf("expected func id 9 on stack, got %d", s.stack[0].FuncID)
 	}
 }
+
+func TestValidatePacketRejectsMisalignedPayload(t *testing.T) {
+	buf := make([]byte, EventSize+3)
+	binary.LittleEndian.PutUint64(buf[0:8], 1)
+	buf[8] = EventEnter
+	if err := validatePacket(buf); err == nil {
+		t.Fatalf("expected validatePacket to fail for misaligned payload")
+	}
+}
+
+func TestValidatePacketRejectsInvalidNameLength(t *testing.T) {
+	buf := make([]byte, NameHeaderSize+2)
+	binary.LittleEndian.PutUint64(buf[0:8], 1)
+	buf[8] = EventFuncName
+	binary.LittleEndian.PutUint32(buf[9:13], 7)
+	binary.LittleEndian.PutUint32(buf[13:17], 99)
+	if err := validatePacket(buf); err == nil {
+		t.Fatalf("expected validatePacket to fail for invalid function-name payload")
+	}
+}

@@ -35,16 +35,18 @@ type Node struct {
 }
 
 type Session struct {
-	ID        uint64
-	Root      *Node
-	stack     []*Node
-	LastSeen  time.Time
-	mu        sync.Mutex
-	nodeCount uint64
-	Closed    bool
-	Exported  bool
-	Protocol  int
-	Dropped   uint64
+	ID                 uint64
+	Root               *Node
+	stack              []*Node
+	LastSeen           time.Time
+	LastEventAt        time.Time
+	AvgInterEventNanos float64
+	mu                 sync.Mutex
+	nodeCount          uint64
+	Closed             bool
+	Exported           bool
+	Protocol           int
+	Dropped            uint64
 }
 
 type DetailedJSON struct {
