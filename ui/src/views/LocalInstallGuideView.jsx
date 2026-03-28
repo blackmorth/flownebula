@@ -3,7 +3,6 @@ import {
     Button,
     Code,
     Container,
-    Divider,
     Heading,
     HStack,
     List,
@@ -45,7 +44,7 @@ export default function LocalInstallGuideView() {
                         </HStack>
                     </VStack>
 
-                    <Divider borderColor="border" />
+                    <Box borderTopWidth="1px" borderColor="border" />
 
                     <Section title="1) Pré-requis (5 min)">
                         <List spacing={2} pl={4} styleType="disc">

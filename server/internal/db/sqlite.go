@@ -62,10 +62,13 @@ func Migrate(db *sql.DB) {
 	}
 
 	alterStatements := []string{
+		`ALTER TABLE sessions ADD COLUMN agent_id TEXT`,
+		`ALTER TABLE sessions ADD COLUMN agent_session_id TEXT`,
 		`ALTER TABLE sessions ADD COLUMN service TEXT`,
 		`ALTER TABLE sessions ADD COLUMN endpoint TEXT`,
 		`ALTER TABLE sessions ADD COLUMN release TEXT`,
 		`ALTER TABLE sessions ADD COLUMN tags TEXT`,
+		`ALTER TABLE sessions ADD COLUMN payload TEXT NOT NULL DEFAULT '{}'`,
 	}
 	for _, stmt := range alterStatements {
 		if _, err := db.Exec(stmt); err != nil {
@@ -75,6 +78,10 @@ func Migrate(db *sql.DB) {
 				log.Fatalf("failed to alter sessions table: %v", err)
 			}
 		}
+	}
+
+	if _, err := db.Exec(`UPDATE sessions SET payload = '{}' WHERE payload IS NULL`); err != nil {
+		log.Fatalf("failed to backfill sessions payload: %v", err)
 	}
 
 	for _, idx := range indexes {

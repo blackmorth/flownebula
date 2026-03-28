@@ -23,8 +23,8 @@ func (r *sqliteRepo) Create(userID int64, agentID string, payload string) (*Sess
 
 	now := time.Now()
 	res, err := tx.Exec(
-		"INSERT INTO sessions (user_id, agent_id, created_at) VALUES (?, ?, ?)",
-		userID, agentID, now,
+		"INSERT INTO sessions (user_id, agent_id, payload, created_at) VALUES (?, ?, ?, ?)",
+		userID, agentID, "{}", now,
 	)
 	if err != nil {
 		return nil, err
