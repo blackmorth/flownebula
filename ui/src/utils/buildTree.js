@@ -12,12 +12,17 @@ export default function buildTree(payload) {
         const node = nodes[id];
         const displayName = node?.nodeId || id;
         const inCurrentPath = path.has(id);
+        const meta = {
+            t_start: viaEdge?.t_start ?? node?.t_start ?? null,
+            t_end: viaEdge?.t_end ?? node?.t_end ?? null,
+        };
 
         if (inCurrentPath) {
             return {
                 id: viaEdge?.edgeId ? `${id}#${viaEdge.edgeId}` : id,
                 name: `${displayName} (recursion)`,
                 cost: viaEdge?.cost?.wt || 0,
+                meta,
                 children: []
             };
         }
@@ -28,6 +33,7 @@ export default function buildTree(payload) {
             id: viaEdge?.edgeId ? `${id}#${viaEdge.edgeId}` : id,
             name: displayName,
             cost: viaEdge?.cost?.wt ?? node?.inclusive_cost?.wt ?? 0,
+            meta,
             children: (children[id] || []).map((edge) => build(edge.callee, path, edge))
         };
 
