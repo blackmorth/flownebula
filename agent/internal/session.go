@@ -58,11 +58,13 @@ func GetSession(id uint64) *Session {
 		return s
 	}
 
+	now := time.Now()
 	s = &Session{
-		ID:       id,
-		Root:     NewNode(0, 1),
-		stack:    []*Node{},
-		LastSeen: time.Now(),
+		ID:          id,
+		Root:        NewNode(0, 1),
+		stack:       []*Node{},
+		LastSeen:    now,
+		LastEventAt: now,
 	}
 	shard.Sessions[id] = s
 	return s
@@ -91,6 +93,21 @@ func (s *Session) Top() *Node {
 func (s *Session) AddEvent(ev CallEvent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	now := time.Now()
+	if !s.LastEventAt.IsZero() {
+		delta := now.Sub(s.LastEventAt).Nanoseconds()
+		if delta > 0 {
+			if s.AvgInterEventNanos == 0 {
+				s.AvgInterEventNanos = float64(delta)
+			} else {
+				const alpha = 0.2
+				s.AvgInterEventNanos = alpha*float64(delta) + (1-alpha)*s.AvgInterEventNanos
+			}
+		}
+	}
+	s.LastEventAt = now
+	s.LastSeen = now
 
 	switch ev.Type {
 	case EventEnter: // enter
@@ -206,7 +223,8 @@ func ExportSessionsLoop() {
 
 func exportReadySessions() {
 	now := time.Now()
-	idleTimeout := 5 * time.Second // ex: session inactive depuis 5s
+	baseIdleTimeout := 5 * time.Second // minimum
+	maxIdleTimeout := 60 * time.Second
 
 	for i := 0; i < NumShards; i++ {
 		shard := SessionShards[i]
@@ -221,10 +239,23 @@ func exportReadySessions() {
 				continue
 			}
 
+			adaptiveIdle := baseIdleTimeout
+			if s.AvgInterEventNanos > 0 {
+				candidate := time.Duration(2 * s.AvgInterEventNanos)
+				if candidate > adaptiveIdle {
+					adaptiveIdle = candidate
+				}
+			}
+			if adaptiveIdle > maxIdleTimeout {
+				adaptiveIdle = maxIdleTimeout
+			}
+
 			// session fermée OU inactive depuis un moment
-			if s.Closed || now.Sub(s.LastSeen) > idleTimeout {
+			if s.Closed || now.Sub(s.LastSeen) > adaptiveIdle {
 				s.mu.Unlock() // on libère avant Print() qui relock
+				flushStart := time.Now()
 				s.Print()
+				recordFlushLatency(flushStart)
 
 				s.mu.Lock()
 				s.Exported = true
