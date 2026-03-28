@@ -5,12 +5,20 @@ export function normalizeText(value) {
 export function detectNodeKind(name) {
     const lower = normalizeText(name);
 
-    if (/\b(sql|select|insert|update|delete|from|join)\b/.test(lower)) {
+    if (/\b(sql|select|insert|update|delete|from|join|repository|dao)\b/.test(lower)) {
         return "sql";
     }
 
-    if (/\b(http|route|controller|endpoint|handler|api)\b/.test(lower)) {
+    if (/\b(http|route|controller|endpoint|handler|api|grpc|graphql)\b/.test(lower)) {
         return "endpoint";
+    }
+
+    if (/\b(redis|memcache|kafka|sqs|sns|rabbitmq|amqp|queue)\b/.test(lower)) {
+        return "external";
+    }
+
+    if (/\b(lock|mutex|semaphore|critical section|spinlock)\b/.test(lower)) {
+        return "lock";
     }
 
     if (/transaction|tx\b/.test(lower)) {
@@ -52,6 +60,7 @@ export function buildDiagnostics(tree) {
     }
 
     const total = Math.max(tree.cost || 0, 1);
+
     const sqlHotspots = flat
         .filter((node) => node.kind === "sql")
         .sort((a, b) => b.cost - a.cost)
@@ -64,10 +73,22 @@ export function buildDiagnostics(tree) {
         .map((node) => node.name);
 
     const nPlusOneSuspects = [...byName.entries()]
-        .filter(([name, count]) => count > 8 && /sql|query|select|find/i.test(name))
+        .filter(([name, count]) => count > 8 && /sql|query|select|find|repository/i.test(name))
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
         .map(([name, count]) => `${name} (x${count})`);
+
+    const lockContentionSuspects = flat
+        .filter((node) => node.kind === "lock")
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 3)
+        .map((node) => `${node.name} (${Math.round((node.cost / total) * 100)}%)`);
+
+    const slowExternalCalls = flat
+        .filter((node) => node.kind === "external" || /http|grpc|api client|fetch/i.test(node.name))
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 3)
+        .map((node) => `${node.name} (${Math.round((node.cost / total) * 100)}%)`);
 
     const hotPath = flat
         .filter((node) => node.depth > 0)
@@ -79,6 +100,8 @@ export function buildDiagnostics(tree) {
         sqlHotspots,
         recursionSuspects,
         nPlusOneSuspects,
+        lockContentionSuspects,
+        slowExternalCalls,
         hotPath,
     };
 }
