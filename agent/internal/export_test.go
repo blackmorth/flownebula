@@ -41,6 +41,20 @@ func TestParseNodeNameVariants(t *testing.T) {
 			display:    "",
 			calledClas: "",
 		},
+		{
+			name:       "internal function",
+			raw:        "internal::standard::strlen",
+			nodeID:     "internal::standard::strlen",
+			display:    "",
+			calledClas: "",
+		},
+		{
+			name:       "internal class method",
+			raw:        "internal::pdo::PDO::query",
+			nodeID:     "internal::pdo::PDO::query",
+			display:    "PDO::query",
+			calledClas: "PDO",
+		},
 	}
 
 	for _, tt := range tests {

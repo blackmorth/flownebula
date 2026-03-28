@@ -90,7 +90,21 @@ uint32_t get_func_id(const zend_function *func)
             ? ZSTR_VAL(func->common.scope->name)
             : NULL;
 
-    if (!func_name && op && op->filename) {
+    if (func->type == ZEND_INTERNAL_FUNCTION) {
+        const char *module_name =
+            (func->internal_function.module && func->internal_function.module->name)
+                ? func->internal_function.module->name
+                : "core";
+
+        if (class_name && func_name) {
+            snprintf(name, sizeof(name), "internal::%s::%s::%s", module_name, class_name, func_name);
+        } else if (func_name) {
+            snprintf(name, sizeof(name), "internal::%s::%s", module_name, func_name);
+        } else {
+            snprintf(name, sizeof(name), "internal::%s::unknown", module_name);
+        }
+    }
+    else if (!func_name && op && op->filename) {
         const char *file = ZSTR_VAL(op->filename);
         const char *base = strrchr(file, '/');
         base = base ? base + 1 : file;
@@ -104,10 +118,16 @@ uint32_t get_func_id(const zend_function *func)
                  base, (unsigned)op->line_start);
     }
     else if (class_name && func_name) {
-        snprintf(name, sizeof(name), "%s::%s", class_name, func_name);
+        const char *file = (op && op->filename) ? ZSTR_VAL(op->filename) : "unknown";
+        const char *base = strrchr(file, '/');
+        base = base ? base + 1 : file;
+        snprintf(name, sizeof(name), "%s::%s::%s", base, class_name, func_name);
     }
     else if (func_name) {
-        snprintf(name, sizeof(name), "%s", func_name);
+        const char *file = (op && op->filename) ? ZSTR_VAL(op->filename) : "unknown";
+        const char *base = strrchr(file, '/');
+        base = base ? base + 1 : file;
+        snprintf(name, sizeof(name), "%s::::%s", base, func_name);
     }
     else {
         snprintf(name, sizeof(name), "internal::unknown");
