@@ -97,8 +97,8 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 				NodeID:              nodeName,
 				Name:                name,
 				CalledClass:         calledClass,
-				InclusiveCost:       map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "nw_in": 0, "nw_out": 0},
-				ExclusiveCost:       map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "nw_in": 0, "nw_out": 0},
+				InclusiveCost:       map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "alloc": 0, "free": 0, "nw_in": 0, "nw_out": 0},
+				ExclusiveCost:       map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "alloc": 0, "free": 0, "nw_in": 0, "nw_out": 0},
 				InclusivePercentage: make(map[string]float64),
 				ExclusivePercentage: make(map[string]float64),
 			}
@@ -156,7 +156,7 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 					edgeID := fmt.Sprintf("e%d", edgeCount)
 					edgesByKey[edgeKey] = edgeID
 
-					cost := map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "nw_in": 0, "nw_out": 0}
+					cost := map[string]int64{"ct": 0, "wt": 0, "cpu": 0, "mu": 0, "pmu": 0, "io": 0, "nw": 0, "alloc": 0, "free": 0, "nw_in": 0, "nw_out": 0}
 					for k, v := range n.Metrics {
 						if k != "ewt" {
 							cost[k] = v
@@ -235,13 +235,15 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 	res := DetailedJSON{
 		AgentSessionID: fmt.Sprintf("%016x", s.ID),
 		Dimensions: map[string]Dimension{
-			"ct":  {"ct", "Calls", false},
-			"wt":  {"wt", "Wall Time", true},
-			"cpu": {"cpu", "CPU", true},
-			"mu":  {"mu", "Instant memory", false},
-			"pmu": {"pmu", "Memory", true},
-			"io":  {"io", "I/O Wait", true},
-			"nw":  {"nw", "Network", true},
+			"ct":    {"ct", "Calls", false},
+			"wt":    {"wt", "Wall Time", true},
+			"cpu":   {"cpu", "CPU", true},
+			"mu":    {"mu", "Instant memory", false},
+			"pmu":   {"pmu", "Memory", true},
+			"io":    {"io", "I/O Wait", true},
+			"nw":    {"nw", "Network", true},
+			"alloc": {"alloc", "Allocated bytes", true},
+			"free":  {"free", "Freed bytes", true},
 		},
 		Root:                rootName,
 		Nodes:               jsonNodes,
@@ -253,6 +255,8 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 		DroppedEvents:       s.Dropped,
 		FlushErrors:         s.FlushErrors,
 		BufferHighWatermark: s.BufferHighWatermark,
+		FirstEventUnixNanos: s.FirstEventUnixNanos,
+		LastEventUnixNanos:  s.LastEventUnixNanos,
 	}
 
 	return json.MarshalIndent(res, "", "  ")

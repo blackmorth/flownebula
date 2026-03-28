@@ -111,6 +111,9 @@ func ProcessPacket(p Packet) {
 			PeakMemory: binary.LittleEndian.Uint64(d[45:53]),
 			IOWait:     binary.LittleEndian.Uint64(d[53:61]),
 			Network:    binary.LittleEndian.Uint64(d[61:69]),
+			EventTime:  binary.LittleEndian.Uint64(d[69:77]),
+			AllocBytes: binary.LittleEndian.Uint64(d[77:85]),
+			FreeBytes:  binary.LittleEndian.Uint64(d[85:93]),
 		}
 		s := GetSession(sessID)
 		s.AddEvent(ev)

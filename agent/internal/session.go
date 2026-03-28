@@ -109,6 +109,14 @@ func (s *Session) AddEvent(ev CallEvent) {
 	}
 	s.LastEventAt = now
 	s.LastSeen = now
+	if ev.EventTime > 0 {
+		if s.FirstEventUnixNanos == 0 || ev.EventTime < s.FirstEventUnixNanos {
+			s.FirstEventUnixNanos = ev.EventTime
+		}
+		if ev.EventTime > s.LastEventUnixNanos {
+			s.LastEventUnixNanos = ev.EventTime
+		}
+	}
 
 	switch ev.Type {
 	case EventEnter: // enter
@@ -156,6 +164,8 @@ func (s *Session) AddEvent(ev CallEvent) {
 		node.Metrics["mu"] += ev.MemDelta
 		node.Metrics["io"] += nsToUS(ev.IOWait)
 		node.Metrics["nw"] += nsToUS(ev.Network)
+		node.Metrics["alloc"] += int64(ev.AllocBytes)
+		node.Metrics["free"] += int64(ev.FreeBytes)
 		if int64(ev.PeakMemory) > node.Metrics["pmu"] {
 			node.Metrics["pmu"] = int64(ev.PeakMemory)
 		}

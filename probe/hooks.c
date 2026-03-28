@@ -11,6 +11,13 @@ static inline uint64_t get_cpu_time_thread(void)
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
+static inline uint64_t get_unix_time_ns(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
 void nebula_execute_ex(zend_execute_data *execute_data)
 {
     if (UNEXPECTED(!NEBULA_G(enabled) || !execute_data->func)) {
@@ -49,6 +56,12 @@ void nebula_execute_ex(zend_execute_data *execute_data)
     uint64_t cpu_total = cpu_end - f->cpu_start;
     uint64_t cpu_excl  = cpu_total - f->cpu_child_time;
     int64_t  mem_delta = (int64_t)end_mem - (int64_t)f->start_mem;
+    uint64_t wait_excl = (exclusive > cpu_excl) ? (exclusive - cpu_excl) : 0;
+    uint8_t kind = nebula_classify_function(func);
+    uint64_t io_wait = (kind & 0x01) ? wait_excl : 0;
+    uint64_t network_wait = (kind & 0x02) ? wait_excl : 0;
+    uint64_t alloc_bytes = mem_delta > 0 ? (uint64_t)mem_delta : 0;
+    uint64_t free_bytes = mem_delta < 0 ? (uint64_t)(-mem_delta) : 0;
 
     if (NEBULA_G(depth) > 0) {
         frame_t *parent = &NEBULA_G(stack)[NEBULA_G(depth) - 1];
@@ -58,11 +71,11 @@ void nebula_execute_ex(zend_execute_data *execute_data)
 
     if (inclusive >= NEBULA_G(threshold_ns) && nebula_should_sample(func_id, f->start_time)) {
         if (!f->emitted) {
-            emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
+            emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0, get_unix_time_ns(), 0, 0);
             f->emitted = 1;
         }
         // exit complet : wall, cpu_excl, mem, peak
-        emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, 0, 0);
+        emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, io_wait, network_wait, get_unix_time_ns(), alloc_bytes, free_bytes);
     }
 }
 
@@ -108,6 +121,12 @@ void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value
     uint64_t cpu_total = cpu_end - f->cpu_start;
     uint64_t cpu_excl  = cpu_total - f->cpu_child_time;
     int64_t  mem_delta = (int64_t)end_mem - (int64_t)f->start_mem;
+    uint64_t wait_excl = (exclusive > cpu_excl) ? (exclusive - cpu_excl) : 0;
+    uint8_t kind = nebula_classify_function(func);
+    uint64_t io_wait = (kind & 0x01) ? wait_excl : 0;
+    uint64_t network_wait = (kind & 0x02) ? wait_excl : 0;
+    uint64_t alloc_bytes = mem_delta > 0 ? (uint64_t)mem_delta : 0;
+    uint64_t free_bytes = mem_delta < 0 ? (uint64_t)(-mem_delta) : 0;
 
     if (NEBULA_G(depth) > 0) {
         frame_t *parent = &NEBULA_G(stack)[NEBULA_G(depth) - 1];
@@ -117,9 +136,9 @@ void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value
 
     if (inclusive >= NEBULA_G(threshold_ns) && nebula_should_sample(func_id, f->start_time)) {
         if (!f->emitted) {
-            emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
+            emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0, get_unix_time_ns(), 0, 0);
             f->emitted = 1;
         }
-        emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, 0, 0);
+        emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, io_wait, network_wait, get_unix_time_ns(), alloc_bytes, free_bytes);
     }
 }

@@ -18,6 +18,9 @@ int main(void) {
     ev.peak_memory = 2048;
     ev.io_wait = 3;
     ev.network = 4;
+    ev.event_time_unix_ns = 555;
+    ev.alloc_bytes = 1024;
+    ev.free_bytes = 512;
 
     memcpy(raw, &ev, sizeof(ev));
 
@@ -34,6 +37,9 @@ int main(void) {
     assert(decoded.peak_memory == 2048);
     assert(decoded.io_wait == 3);
     assert(decoded.network == 4);
+    assert(decoded.event_time_unix_ns == 555);
+    assert(decoded.alloc_bytes == 1024);
+    assert(decoded.free_bytes == 512);
 
     nebula_name_t nameMsg = {0};
     memcpy(nameMsg.session_id, "12345678", SESSION_ID_SIZE);
