@@ -22,8 +22,11 @@ typedef struct {
     uint64_t cpu_time;     // EXIT only (exclusive)
     int64_t  mem_delta;    // EXIT only
     uint64_t peak_memory;  // EXIT only
-    uint64_t io_wait;      // 0 (réservé)
-    uint64_t network;      // 0 (réservé)
+    uint64_t io_wait;      // EXIT only (blocked/wait time)
+    uint64_t network;      // EXIT only (network wait time)
+    uint64_t event_time_unix_ns; // ENTER/EXIT absolute timestamp (UTC)
+    uint64_t alloc_bytes;  // EXIT only
+    uint64_t free_bytes;   // EXIT only
 } nebula_event_t;
 
 /*

@@ -1,10 +1,13 @@
 #include "nebula_probe.h"
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+
+static uint64_t get_unix_time_ns(void);
 
 zend_bool nebula_should_sample(uint32_t func_id, uint64_t start_time)
 {
@@ -148,7 +151,8 @@ uint64_t get_io_wait(void) { return 0; }
 uint64_t get_nw_usage(void) { return 0; }
 
 void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive,
-               uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network)
+               uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network,
+               uint64_t event_time_unix_ns, uint64_t alloc_bytes, uint64_t free_bytes)
 {
     if (!func_id && event_type == 1) return;
     uint32_t pos = atomic_fetch_add(&NEBULA_G(write_pos), 1);
@@ -171,6 +175,9 @@ void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_
     e->peak_memory = peak_memory;
     e->io_wait     = io_wait;
     e->network     = network;
+    e->event_time_unix_ns = event_time_unix_ns ? event_time_unix_ns : get_unix_time_ns();
+    e->alloc_bytes = alloc_bytes;
+    e->free_bytes  = free_bytes;
 }
 
 void flush_buffer(void)
@@ -217,6 +224,66 @@ void nebula_send_session_end(unsigned char *session_id)
         0,                        // mem_delta
         0,                        // peak_memory
         atomic_load(&NEBULA_G(overflow_count)), // io_wait = dropped events counter
-        NEBULA_PROTOCOL_VERSION                 // network = protocol version
+        NEBULA_PROTOCOL_VERSION,                // network = protocol version
+        0,                        // event_time_unix_ns
+        0,                        // alloc_bytes
+        0                         // free_bytes
     );
+}
+enum {
+    NEBULA_KIND_NONE    = 0,
+    NEBULA_KIND_IO      = 1 << 0,
+    NEBULA_KIND_NETWORK = 1 << 1,
+};
+
+static zend_bool contains_nocase(const char *haystack, const char *needle)
+{
+    if (!haystack || !needle || !*needle) return 0;
+    size_t nlen = strlen(needle);
+    for (const char *p = haystack; *p; p++) {
+        if (strncasecmp(p, needle, nlen) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+uint8_t nebula_classify_function(const zend_function *func)
+{
+    if (!func) return NEBULA_KIND_NONE;
+
+    const char *func_name =
+        func->common.function_name ? ZSTR_VAL(func->common.function_name) : NULL;
+    const char *class_name =
+        (func->common.scope && func->common.scope->name)
+            ? ZSTR_VAL(func->common.scope->name)
+            : NULL;
+
+    if ((class_name && contains_nocase(class_name, "PDO")) ||
+        (func_name && (contains_nocase(func_name, "mysql") || contains_nocase(func_name, "pgsql") ||
+                       contains_nocase(func_name, "sqlite") || contains_nocase(func_name, "redis")))) {
+        return NEBULA_KIND_IO;
+    }
+
+    if ((func_name && (contains_nocase(func_name, "curl") || contains_nocase(func_name, "socket") ||
+                       contains_nocase(func_name, "http") || contains_nocase(func_name, "stream_socket") ||
+                       contains_nocase(func_name, "fsockopen"))) ||
+        (class_name && contains_nocase(class_name, "Socket"))) {
+        return (uint8_t)(NEBULA_KIND_IO | NEBULA_KIND_NETWORK);
+    }
+
+    if (func_name && (contains_nocase(func_name, "fopen") || contains_nocase(func_name, "fread") ||
+                      contains_nocase(func_name, "fwrite") || contains_nocase(func_name, "file_") ||
+                      contains_nocase(func_name, "scandir"))) {
+        return NEBULA_KIND_IO;
+    }
+
+    return NEBULA_KIND_NONE;
+}
+
+static uint64_t get_unix_time_ns(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }

@@ -15,7 +15,7 @@
 #define NEBULA_STACK_SIZE 256
 #define NEBULA_RING_SIZE  65536
 #define NEBULA_BATCH_SIZE 20
-#define NEBULA_PROTOCOL_VERSION 1
+#define NEBULA_PROTOCOL_VERSION 2
 
 typedef struct frame_t {
     const zend_function *func;
@@ -79,10 +79,11 @@ uint64_t get_nw_usage(void);
 uint32_t get_func_id(const zend_function *func);
 void generate_session_id(char out[SESSION_ID_SIZE]);
 void send_func_name(uint32_t func_id, const char *name);
-void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive, uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network);
+void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_t exclusive, uint64_t cpu_time, int64_t mem_delta, uint64_t peak_memory, uint64_t io_wait, uint64_t network, uint64_t event_time_unix_ns, uint64_t alloc_bytes, uint64_t free_bytes);
 void flush_buffer(void);
 void nebula_send_session_end(unsigned char *session_id);
 zend_bool nebula_should_sample(uint32_t func_id, uint64_t start_time);
+uint8_t nebula_classify_function(const zend_function *func);
 
 /* Hooks */
 extern void (*old_execute_ex)(zend_execute_data *execute_data);

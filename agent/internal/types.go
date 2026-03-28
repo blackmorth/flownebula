@@ -15,6 +15,9 @@ type CallEvent struct {
 	PeakMemory uint64
 	IOWait     uint64
 	Network    uint64
+	EventTime  uint64
+	AllocBytes uint64
+	FreeBytes  uint64
 }
 
 const (
@@ -22,10 +25,10 @@ const (
 	EventExit       = 1
 	EventFuncName   = 255
 	EventSessionEnd = 254
-	ProtocolVersion = 1
+	ProtocolVersion = 2
 	SessionIDSize   = 8
 	NameHeaderSize  = 17 // 8 (SID) + 1 (Type) + 4 (ID) + 4 (Len)
-	EventSize       = 8 + 1 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 8
+	EventSize       = 8 + 1 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8
 )
 
 type Node struct {
@@ -50,6 +53,8 @@ type Session struct {
 	Dropped             uint64
 	FlushErrors         uint64
 	BufferHighWatermark uint64
+	FirstEventUnixNanos uint64
+	LastEventUnixNanos  uint64
 }
 
 type DetailedJSON struct {
@@ -65,6 +70,8 @@ type DetailedJSON struct {
 	DroppedEvents       uint64               `json:"dropped_events,omitempty"`
 	FlushErrors         uint64               `json:"flush_errors,omitempty"`
 	BufferHighWatermark uint64               `json:"buffer_high_watermark,omitempty"`
+	FirstEventUnixNanos uint64               `json:"first_event_unix_ns,omitempty"`
+	LastEventUnixNanos  uint64               `json:"last_event_unix_ns,omitempty"`
 }
 
 type JSONEdge struct {
