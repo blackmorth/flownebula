@@ -14,13 +14,13 @@ type Handler struct {
 	sessions sessions.Repository
 }
 
-func RegisterRoutes(app fiber.Router, sessionRepo sessions.Repository) {
+func RegisterRoutes(app fiber.Router, sessionRepo sessions.Repository, uploadMiddlewares ...fiber.Handler) {
 	h := &Handler{
 		sessions: sessionRepo,
 	}
 
 	app.Post("/heartbeat", h.Heartbeat)
-	app.Post("/session-upload", h.UploadSession)
+	app.Post("/session-upload", append(uploadMiddlewares, h.UploadSession)...)
 }
 
 func (h *Handler) Heartbeat(c *fiber.Ctx) error {
@@ -51,8 +51,6 @@ func (h *Handler) Heartbeat(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UploadSession(c *fiber.Ctx) error {
-	log.Printf("[UPLOAD] Raw body: %s", c.Body())
-
 	var userID int64 = 0
 	if v := c.Locals("user_id"); v != nil {
 		if id, ok := v.(int64); ok {
@@ -62,11 +60,9 @@ func (h *Handler) UploadSession(c *fiber.Ctx) error {
 
 	var payload map[string]interface{}
 	if err := c.BodyParser(&payload); err != nil {
-		log.Printf("[UPLOAD] BodyParser error: %v", err)
+		log.Printf("[UPLOAD] invalid JSON body: %v", err)
 		return fiber.ErrBadRequest
 	}
-
-	log.Printf("[UPLOAD] Parsed payload: %+v", payload)
 
 	agentSessionID := ""
 	if v, ok := payload["agent_session_id"].(string); ok {
@@ -77,8 +73,24 @@ func (h *Handler) UploadSession(c *fiber.Ctx) error {
 	if v, ok := payload["agent_id"].(string); ok {
 		agentID = v
 	}
-
-	log.Printf("[UPLOAD] agent_id=%s agent_session_id=%s user_id=%d", agentID, agentSessionID, userID)
+	service := ""
+	if v, ok := payload["service"].(string); ok {
+		service = v
+	}
+	endpoint := ""
+	if v, ok := payload["endpoint"].(string); ok {
+		endpoint = v
+	}
+	release := ""
+	if v, ok := payload["release"].(string); ok {
+		release = v
+	}
+	tags := ""
+	if rawTags, ok := payload["tags"]; ok {
+		if b, err := json.Marshal(rawTags); err == nil {
+			tags = string(b)
+		}
+	}
 
 	jsonBytes, _ := json.Marshal(payload)
 
@@ -86,11 +98,13 @@ func (h *Handler) UploadSession(c *fiber.Ctx) error {
 		UserID:         userID,
 		AgentID:        agentID,
 		AgentSessionID: agentSessionID,
+		Service:        service,
+		Endpoint:       endpoint,
+		Release:        release,
+		Tags:           tags,
 		Payload:        datatypes.JSON(jsonBytes),
 		CreatedAt:      time.Now(),
 	}
-
-	log.Printf("[UPLOAD] Inserting session into DB…")
 
 	if err := h.sessions.Create(session); err != nil {
 		log.Printf("[UPLOAD] DB error: %v", err)
@@ -99,7 +113,7 @@ func (h *Handler) UploadSession(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("[UPLOAD] Stored session ID %d", session.ID)
+	log.Printf("[UPLOAD] stored session=%d user_id=%d agent_id=%s payload_bytes=%d", session.ID, userID, agentID, len(jsonBytes))
 
 	return c.Status(201).JSON(fiber.Map{
 		"session_id": session.ID,

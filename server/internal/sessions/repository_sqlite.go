@@ -21,11 +21,15 @@ func (r *sqliteRepo) Create(session *Session) error {
 	session.CreatedAt = now
 
 	res, err := r.db.Exec(
-		`INSERT INTO sessions (user_id, agent_id, agent_session_id, payload, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO sessions (user_id, agent_id, agent_session_id, service, endpoint, release, tags, payload, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		session.UserID,
 		session.AgentID,
 		session.AgentSessionID,
+		session.Service,
+		session.Endpoint,
+		session.Release,
+		session.Tags,
 		string(session.Payload), // datatypes.JSON → string
 		session.CreatedAt,
 	)
@@ -40,7 +44,7 @@ func (r *sqliteRepo) Create(session *Session) error {
 
 func (r *sqliteRepo) List() ([]*Session, error) {
 	rows, err := r.db.Query(
-		`SELECT id, user_id, agent_id, agent_session_id, payload, created_at
+		`SELECT id, user_id, agent_id, agent_session_id, service, endpoint, release, tags, payload, created_at
          FROM sessions ORDER BY id DESC`,
 	)
 	if err != nil {
@@ -58,6 +62,10 @@ func (r *sqliteRepo) List() ([]*Session, error) {
 			&s.UserID,
 			&s.AgentID,
 			&s.AgentSessionID,
+			&s.Service,
+			&s.Endpoint,
+			&s.Release,
+			&s.Tags,
 			&payloadStr,
 			&s.CreatedAt,
 		); err != nil {
@@ -73,7 +81,7 @@ func (r *sqliteRepo) List() ([]*Session, error) {
 
 func (r *sqliteRepo) Get(id int64) (*Session, error) {
 	row := r.db.QueryRow(
-		`SELECT id, user_id, agent_id, agent_session_id, payload, created_at
+		`SELECT id, user_id, agent_id, agent_session_id, service, endpoint, release, tags, payload, created_at
          FROM sessions WHERE id = ?`,
 		id,
 	)
@@ -86,6 +94,10 @@ func (r *sqliteRepo) Get(id int64) (*Session, error) {
 		&s.UserID,
 		&s.AgentID,
 		&s.AgentSessionID,
+		&s.Service,
+		&s.Endpoint,
+		&s.Release,
+		&s.Tags,
 		&payloadStr,
 		&s.CreatedAt,
 	); err != nil {

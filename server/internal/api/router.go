@@ -10,12 +10,16 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"log"
 )
 
 func New() *fiber.App {
+	cfg := LoadConfig()
+
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:8081",
+		AllowOrigins:     cfg.CORSAllowOrigins,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders:     "Content-Type, Authorization",
 		AllowCredentials: true,
@@ -30,6 +34,12 @@ func New() *fiber.App {
 	})
 	sqlite := db.Open("nebula.db")
 	db.Migrate(sqlite)
+	deleted, err := db.ApplyRetention(sqlite, cfg.SessionRetentionInDays)
+	if err != nil {
+		log.Printf("failed to apply session retention policy: %v", err)
+	} else if deleted > 0 {
+		log.Printf("retention cleanup removed %d old sessions", deleted)
+	}
 
 	authRepo := auth.NewSQLiteRepo(sqlite)
 	sessionRepo := sessions.NewSQLiteRepo(sqlite)
@@ -52,7 +62,13 @@ func New() *fiber.App {
 	sessions.RegisterRoutes(protected, sessionRepo)
 
 	agent := app.Group("/agent", middleware.JWTProtected())
-	agentapi.RegisterRoutes(agent, sessionRepo)
+	agentUploadProtection := []fiber.Handler{
+		limiter.New(limiter.Config{
+			Max: cfg.UploadRatePerMinute,
+		}),
+		middleware.LimitRequestBody(cfg.UploadMaxPayloadBytes),
+	}
+	agentapi.RegisterRoutes(agent, sessionRepo, agentUploadProtection...)
 	profiles.RegisterRoutes(agent, profilesRepo)
 
 	return app
