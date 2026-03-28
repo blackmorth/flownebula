@@ -36,31 +36,35 @@ type Node struct {
 }
 
 type Session struct {
-	ID                 uint64
-	Root               *Node
-	stack              []*Node
-	LastSeen           time.Time
-	LastEventAt        time.Time
-	AvgInterEventNanos float64
-	mu                 sync.Mutex
-	nodeCount          uint64
-	Closed             bool
-	Exported           bool
-	Protocol           int
-	Dropped            uint64
+	ID                  uint64
+	Root                *Node
+	stack               []*Node
+	LastSeen            time.Time
+	LastEventAt         time.Time
+	AvgInterEventNanos  float64
+	mu                  sync.Mutex
+	nodeCount           uint64
+	Closed              bool
+	Exported            bool
+	Protocol            int
+	Dropped             uint64
+	FlushErrors         uint64
+	BufferHighWatermark uint64
 }
 
 type DetailedJSON struct {
-	AgentSessionID string               `json:"agent_session_id"`
-	Dimensions     map[string]Dimension `json:"dimensions"`
-	Root           string               `json:"root"`
-	Nodes          map[string]JSONNode  `json:"nodes"`
-	Edges          map[string]JSONEdge  `json:"edges"`
-	Comparison     bool                 `json:"comparison"`
-	Peaks          Peaks                `json:"peaks"`
-	Language       string               `json:"language"`
-	Protocol       int                  `json:"protocol_version"`
-	DroppedEvents  uint64               `json:"dropped_events,omitempty"`
+	AgentSessionID      string               `json:"agent_session_id"`
+	Dimensions          map[string]Dimension `json:"dimensions"`
+	Root                string               `json:"root"`
+	Nodes               map[string]JSONNode  `json:"nodes"`
+	Edges               map[string]JSONEdge  `json:"edges"`
+	Comparison          bool                 `json:"comparison"`
+	Peaks               Peaks                `json:"peaks"`
+	Language            string               `json:"language"`
+	Protocol            int                  `json:"protocol_version"`
+	DroppedEvents       uint64               `json:"dropped_events,omitempty"`
+	FlushErrors         uint64               `json:"flush_errors,omitempty"`
+	BufferHighWatermark uint64               `json:"buffer_high_watermark,omitempty"`
 }
 
 type JSONEdge struct {

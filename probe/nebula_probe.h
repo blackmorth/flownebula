@@ -45,6 +45,8 @@ ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     char                *session_id_ptr;
     uint64_t             request_start;
     atomic_uint_fast64_t overflow_count;
+    atomic_uint_fast64_t flush_error_count;
+    atomic_uint_fast32_t high_watermark;
 ZEND_END_MODULE_GLOBALS(nebula_probe)
 
 extern zend_nebula_probe_globals nebula_probe_globals;

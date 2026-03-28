@@ -61,9 +61,11 @@ func TestSessionEndCarriesDroppedEventsAndProtocol(t *testing.T) {
 	}
 
 	s.AddEvent(CallEvent{
-		Type:    EventSessionEnd,
-		IOWait:  123,
-		Network: 1,
+		Type:      EventSessionEnd,
+		Inclusive: 7,
+		Exclusive: 8192,
+		IOWait:    123,
+		Network:   1,
 	})
 
 	if !s.Closed {
@@ -74,5 +76,11 @@ func TestSessionEndCarriesDroppedEventsAndProtocol(t *testing.T) {
 	}
 	if s.Protocol != 1 {
 		t.Fatalf("protocol = %d, want 1", s.Protocol)
+	}
+	if s.FlushErrors != 7 {
+		t.Fatalf("flush_errors = %d, want 7", s.FlushErrors)
+	}
+	if s.BufferHighWatermark != 8192 {
+		t.Fatalf("buffer_high_watermark = %d, want 8192", s.BufferHighWatermark)
 	}
 }
