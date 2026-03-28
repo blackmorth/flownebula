@@ -52,3 +52,27 @@ func TestAddEventConvertsTimingToMicroseconds(t *testing.T) {
 		t.Fatalf("cpu = %d, want 2000 (us)", got)
 	}
 }
+
+func TestSessionEndCarriesDroppedEventsAndProtocol(t *testing.T) {
+	s := &Session{
+		ID:    2,
+		Root:  NewNode(0, 1),
+		stack: []*Node{},
+	}
+
+	s.AddEvent(CallEvent{
+		Type:    EventSessionEnd,
+		IOWait:  123,
+		Network: 1,
+	})
+
+	if !s.Closed {
+		t.Fatal("session should be closed after EventSessionEnd")
+	}
+	if s.Dropped != 123 {
+		t.Fatalf("dropped = %d, want 123", s.Dropped)
+	}
+	if s.Protocol != 1 {
+		t.Fatalf("protocol = %d, want 1", s.Protocol)
+	}
+}

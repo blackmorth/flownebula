@@ -142,6 +142,8 @@ func (s *Session) AddEvent(ev CallEvent) {
 			node.Metrics["pmu"] = int64(ev.PeakMemory)
 		}
 	case EventSessionEnd:
+		s.Dropped = ev.IOWait
+		s.Protocol = int(ev.Network)
 		s.Closed = true
 		return
 	}

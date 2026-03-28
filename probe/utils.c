@@ -4,13 +4,25 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 void generate_session_id(char out[SESSION_ID_SIZE])
 {
     static _Atomic uint64_t counter = 0;
+    uint64_t val = 0;
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd >= 0) {
+        ssize_t n = read(fd, &val, sizeof(val));
+        close(fd);
+        if (n == (ssize_t)sizeof(val)) {
+            memcpy(out, &val, SESSION_ID_SIZE);
+            return;
+        }
+    }
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    uint64_t val = ((uint64_t)tv.tv_usec << 32) | (uint32_t)tv.tv_sec;
+    val = ((uint64_t)tv.tv_usec << 32) | (uint32_t)tv.tv_sec;
+    val ^= ((uint64_t)getpid() << 16);
     val ^= ++counter;
     memcpy(out, &val, SESSION_ID_SIZE);
 }
@@ -123,8 +135,10 @@ void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_
 {
     if (!func_id && event_type == 1) return;
     uint32_t pos = atomic_fetch_add(&NEBULA_G(write_pos), 1);
-    pos &= (NEBULA_RING_SIZE - 1); // si NEBULA_RING_SIZE est une puissance de 2
-    if (pos >= NEBULA_RING_SIZE) return;
+    if (pos >= NEBULA_RING_SIZE) {
+        atomic_fetch_add(&NEBULA_G(overflow_count), 1);
+        return;
+    }
     nebula_event_t *e = &NEBULA_G(buffer)[pos];
     memcpy(e->session_id, NEBULA_G(session_id_ptr), SESSION_ID_SIZE);
     e->event_type = event_type;
@@ -174,7 +188,7 @@ void nebula_send_session_end(unsigned char *session_id)
         0,                        // cpu_time
         0,                        // mem_delta
         0,                        // peak_memory
-        0,                        // io_wait
-        0                         // network
+        atomic_load(&NEBULA_G(overflow_count)), // io_wait = dropped events counter
+        NEBULA_PROTOCOL_VERSION                 // network = protocol version
     );
 }
