@@ -25,6 +25,7 @@ services:
       retries: 20
     environment:
       - GO_ENV=development
+      - GOFLAGS=-mod=mod
   agent:
     image: golang:1.26-alpine
     working_dir: /app
