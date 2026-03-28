@@ -33,9 +33,7 @@ void nebula_execute_ex(zend_execute_data *execute_data)
     f->cpu_child_time = 0;
     f->start_mem      = zend_memory_usage(0);
     f->peak_mem_start = zend_memory_peak_usage(0);
-
-    // enter event minimal : juste pour stack agent
-    emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
+    f->emitted        = 0;
 
     old_execute_ex(execute_data);
 
@@ -58,8 +56,14 @@ void nebula_execute_ex(zend_execute_data *execute_data)
         parent->cpu_child_time += cpu_total;
     }
 
-    // exit complet : wall, cpu_excl, mem, peak
-    emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, 0, 0);
+    if (inclusive >= NEBULA_G(threshold_ns)) {
+        if (!f->emitted) {
+            emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
+            f->emitted = 1;
+        }
+        // exit complet : wall, cpu_excl, mem, peak
+        emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, 0, 0);
+    }
 }
 
 void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value)
@@ -87,8 +91,7 @@ void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value
     f->cpu_child_time = 0;
     f->start_mem      = zend_memory_usage(0);
     f->peak_mem_start = zend_memory_peak_usage(0);
-
-    emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
+    f->emitted        = 0;
 
     if (old_execute_internal) old_execute_internal(execute_data, return_value);
     else execute_internal(execute_data, return_value);
@@ -112,5 +115,11 @@ void nebula_execute_internal(zend_execute_data *execute_data, zval *return_value
         parent->cpu_child_time += cpu_total;
     }
 
-    emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, 0, 0);
+    if (inclusive >= NEBULA_G(threshold_ns)) {
+        if (!f->emitted) {
+            emit_call(0, func_id, 0, 0, 0, 0, 0, 0, 0);
+            f->emitted = 1;
+        }
+        emit_call(1, func_id, inclusive, exclusive, cpu_excl, mem_delta, (uint64_t)peak_mem, 0, 0);
+    }
 }

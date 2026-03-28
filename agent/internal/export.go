@@ -243,12 +243,14 @@ func (s *Session) ExportToDetailedJSON() ([]byte, error) {
 			"io":  {"io", "I/O Wait", true},
 			"nw":  {"nw", "Network", true},
 		},
-		Root:       rootName,
-		Nodes:      jsonNodes,
-		Edges:      jsonEdges,
-		Comparison: false,
-		Peaks:      peaks,
-		Language:   "php",
+		Root:          rootName,
+		Nodes:         jsonNodes,
+		Edges:         jsonEdges,
+		Comparison:    false,
+		Peaks:         peaks,
+		Language:      "php",
+		Protocol:      s.Protocol,
+		DroppedEvents: s.Dropped,
 	}
 
 	return json.MarshalIndent(res, "", "  ")

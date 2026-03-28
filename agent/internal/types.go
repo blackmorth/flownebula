@@ -43,6 +43,8 @@ type Session struct {
 	nodeCount uint64
 	Closed    bool
 	Exported  bool
+	Protocol  int
+	Dropped   uint64
 }
 
 type DetailedJSON struct {
@@ -54,6 +56,8 @@ type DetailedJSON struct {
 	Comparison     bool                 `json:"comparison"`
 	Peaks          Peaks                `json:"peaks"`
 	Language       string               `json:"language"`
+	Protocol       int                  `json:"protocol_version,omitempty"`
+	DroppedEvents  uint64               `json:"dropped_events,omitempty"`
 }
 
 type JSONEdge struct {

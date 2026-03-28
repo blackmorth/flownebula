@@ -15,6 +15,7 @@
 #define NEBULA_STACK_SIZE 256
 #define NEBULA_RING_SIZE  65536
 #define NEBULA_BATCH_SIZE 20
+#define NEBULA_PROTOCOL_VERSION 1
 
 typedef struct frame_t {
     const zend_function *func;
@@ -26,6 +27,7 @@ typedef struct frame_t {
     size_t   peak_mem_start;
     uint64_t io_start;
     uint64_t nw_start;
+    zend_bool emitted;
 } frame_t;
 
 ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
@@ -41,6 +43,7 @@ ZEND_BEGIN_MODULE_GLOBALS(nebula_probe)
     HashTable            func_map;
     char                *session_id_ptr;
     uint64_t             request_start;
+    atomic_uint_fast64_t overflow_count;
 ZEND_END_MODULE_GLOBALS(nebula_probe)
 
 extern zend_nebula_probe_globals nebula_probe_globals;
