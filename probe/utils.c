@@ -175,13 +175,13 @@ void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_
                uint64_t event_time_unix_ns, uint64_t alloc_bytes, uint64_t free_bytes)
 {
     if (!func_id && event_type == 1) return;
-    uint32_t pos = atomic_fetch_add(&NEBULA_G(write_pos), 1);
+    uint_fast32_t pos = atomic_fetch_add(&NEBULA_G(write_pos), 1);
     if (pos >= NEBULA_RING_SIZE) {
         atomic_fetch_add(&NEBULA_G(overflow_count), 1);
         return;
     }
-    uint32_t in_use = pos + 1;
-    uint32_t hw = atomic_load(&NEBULA_G(high_watermark));
+    uint_fast32_t in_use = pos + 1;
+    uint_fast32_t hw = atomic_load(&NEBULA_G(high_watermark));
     while (in_use > hw && !atomic_compare_exchange_weak(&NEBULA_G(high_watermark), &hw, in_use)) {
     }
     nebula_event_t *e = &NEBULA_G(buffer)[pos];
