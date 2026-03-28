@@ -33,26 +33,37 @@ export default function IndexView() {
                     avec un minimum overhead et sans dépendance réseau dans le hot‑path.
                 </Text>
 
-                <HStack spacing={4} mt={4}>
+                <HStack spacing={4} mt={4} flexWrap="wrap" justify="center">
                     <Button
                         as={RouterLink}
-                        to="/register"
+                        to="/guide/local-install"
                         size="lg"
                         bg="primary"
                         color="white"
                         _hover={{ bg: "primaryHover" }}
                     >
-                        Installer Flow Nebula
+                        Guide d&apos;installation locale
+                    </Button>
+
+                    <Button
+                        as={RouterLink}
+                        to="/register"
+                        size="lg"
+                        variant="outline"
+                        borderColor="primary"
+                        color="primary"
+                        _hover={{ bg: "primary", color: "white" }}
+                    >
+                        Créer un compte
                     </Button>
 
                     <Button
                         as={RouterLink}
                         to="/login"
                         size="lg"
-                        variant="outline"
-                        borderColor="primary"
-                        color="primary"
-                        _hover={{ bg: "primary", color: "white" }}
+                        variant="ghost"
+                        color="text.muted"
+                        _hover={{ bg: "bg.subtle", color: "primary" }}
                     >
                         Voir la démo
                     </Button>
