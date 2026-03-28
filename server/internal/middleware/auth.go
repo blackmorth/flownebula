@@ -45,7 +45,11 @@ func JWTProtected() fiber.Handler {
 }
 
 func addCORSHeaders(c *fiber.Ctx) {
-	c.Set("Access-Control-Allow-Origin", "http://localhost:8081")
+	origin := c.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	c.Set("Access-Control-Allow-Origin", origin)
 	c.Set("Access-Control-Allow-Credentials", "true")
 }
 
