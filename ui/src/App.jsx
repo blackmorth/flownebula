@@ -7,6 +7,7 @@ import SettingsAgentToken from "./pages/SettingsAgentToken.jsx";
 import AdminUsers from "./pages/AdminUsers.jsx";
 import Sessions from "./pages/Sessions.jsx";
 import SessionDetail from "./pages/SessionDetail.jsx";
+import LocalInstallGuide from "./pages/LocalInstallGuide.jsx";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
+          <Route path="/guide/local-install" element={<LocalInstallGuide />} />
       </Routes>
   );
 }
