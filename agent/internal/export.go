@@ -14,6 +14,31 @@ import (
 //
 //	"{closure}::filename/line_start-line_end"
 func parseNodeName(raw string) (nodeID, name, calledClass string) {
+	// Internal/native frames symbolicated by the probe.
+	// Formats:
+	//   "internal::module::function"
+	//   "internal::module::Class::method"
+	if strings.HasPrefix(raw, "internal::") {
+		parts := strings.Split(raw, "::")
+		if len(parts) >= 4 {
+			module := parts[1]
+			if len(parts) >= 5 {
+				className := parts[2]
+				method := parts[3]
+				if className != "" && method != "" {
+					nodeID = "internal::" + module + "::" + className + "::" + method
+					return nodeID, className + "::" + method, className
+				}
+			}
+			funcName := parts[2]
+			if funcName != "" {
+				nodeID = "internal::" + module + "::" + funcName
+				return nodeID, "", ""
+			}
+		}
+		return raw, "", ""
+	}
+
 	// Closures émises directement par la probe avec le bon format
 	if strings.HasPrefix(raw, "{closure}::") {
 		return raw, "", ""
