@@ -156,6 +156,10 @@ void emit_call(uint8_t event_type, uint32_t func_id, uint64_t inclusive, uint64_
         atomic_fetch_add(&NEBULA_G(overflow_count), 1);
         return;
     }
+    uint32_t in_use = pos + 1;
+    uint32_t hw = atomic_load(&NEBULA_G(high_watermark));
+    while (in_use > hw && !atomic_compare_exchange_weak(&NEBULA_G(high_watermark), &hw, in_use)) {
+    }
     nebula_event_t *e = &NEBULA_G(buffer)[pos];
     memcpy(e->session_id, NEBULA_G(session_id_ptr), SESSION_ID_SIZE);
     e->event_type = event_type;
@@ -188,8 +192,14 @@ void flush_buffer(void)
                          0, (struct sockaddr *)&NEBULA_G(agent_addr_un), sizeof(struct sockaddr_un));
         } while (res < 0 && errno == EINTR);
 
-        if (res < 0) break;
-        if ((size_t)res != payload_size) break;
+        if (res < 0) {
+            atomic_fetch_add(&NEBULA_G(flush_error_count), 1);
+            break;
+        }
+        if ((size_t)res != payload_size) {
+            atomic_fetch_add(&NEBULA_G(flush_error_count), 1);
+            break;
+        }
         sent += to_send;
     }
     atomic_store(&NEBULA_G(write_pos), 0);
@@ -197,11 +207,12 @@ void flush_buffer(void)
 
 void nebula_send_session_end(unsigned char *session_id)
 {
+    (void)session_id;
     emit_call(
         NEBULA_EVENT_SESSION_END, // event_type
         0,                        // func_id
-        0,                        // inclusive
-        0,                        // exclusive
+        atomic_load(&NEBULA_G(flush_error_count)), // inclusive = flush errors
+        atomic_load(&NEBULA_G(high_watermark)),    // exclusive = ring high watermark
         0,                        // cpu_time
         0,                        // mem_delta
         0,                        // peak_memory

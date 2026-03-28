@@ -161,6 +161,8 @@ func (s *Session) AddEvent(ev CallEvent) {
 		}
 	case EventSessionEnd:
 		s.Dropped = ev.IOWait
+		s.FlushErrors = ev.Inclusive
+		s.BufferHighWatermark = ev.Exclusive
 		s.Protocol = int(ev.Network)
 		s.Closed = true
 		return

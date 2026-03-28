@@ -39,6 +39,8 @@ PHP_MINIT_FUNCTION(nebula_probe)
     NEBULA_G(next_func_id) = 2; /* 0 = root synthétique agent, 1 = entrée requête réservé */
     atomic_store(&NEBULA_G(write_pos), 0);
     atomic_store(&NEBULA_G(overflow_count), 0);
+    atomic_store(&NEBULA_G(flush_error_count), 0);
+    atomic_store(&NEBULA_G(high_watermark), 0);
     old_execute_ex = zend_execute_ex;
     zend_execute_ex = nebula_execute_ex;
     old_execute_internal = zend_execute_internal;
@@ -73,6 +75,8 @@ PHP_RINIT_FUNCTION(nebula_probe)
     NEBULA_G(depth) = 0;
     atomic_store(&NEBULA_G(write_pos), 0);
     atomic_store(&NEBULA_G(overflow_count), 0);
+    atomic_store(&NEBULA_G(flush_error_count), 0);
+    atomic_store(&NEBULA_G(high_watermark), 0);
     generate_session_id(NEBULA_G(session_id_ptr));
 
     /* Point d'entrée réel : func_id=1 réservé pour toute la requête */
