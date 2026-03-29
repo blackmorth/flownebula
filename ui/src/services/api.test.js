@@ -44,4 +44,14 @@ describe('api', () => {
     const res = await api('POST', '/auth/login', { email: 'bad@x' })
     expect(res).toEqual({ error: 'invalid credentials' })
   })
+
+  it('returns a friendly error payload on network failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'))
+
+    const res = await api('GET', '/health')
+    expect(res).toEqual({
+      error: 'Impossible de joindre le serveur. Vérifiez votre connexion.',
+      networkError: true,
+    })
+  })
 })
