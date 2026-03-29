@@ -5,7 +5,9 @@ services:
       dockerfile: ../docker/Dockerfile.agent
     command:
       - /opt/nebula/nebula-agent
-      - -metrics-addr=:9108
+      - --metrics-addr=:9108
+      - --server-url=${NEBULA_SERVER_URL:-http://server:8080}
+      - --agent-token=${NEBULA_AGENT_TOKEN:-}
     volumes:
       - nebula-sock:/var/run
       - nebula-bin:/opt/nebula
@@ -34,15 +36,19 @@ services:
       - "9109:9109"
     environment:
       SERVER_METRICS_ADDR: ":9109"
+      DB_PATH: "/data/nebula.db"
+    volumes:
+      - ./data:/data
     restart: unless-stopped
+
   ui:
     build:
       context: ./ui
       dockerfile: ../docker/Dockerfile.ui
     ports:
       - "8081:80"
-    #depends_on:
-     # - server
+    # depends_on:
+    #   - server
 
   prometheus:
     image: prom/prometheus:latest
