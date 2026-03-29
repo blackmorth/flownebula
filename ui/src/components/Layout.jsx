@@ -71,7 +71,7 @@ export default function Layout({ children }) {
                     <VStack align="stretch" spacing={1}>
                         <NavItem to="/dashboard" label="Dashboard" />
                         <NavItem to="/sessions" label="Sessions" />
-                        <NavItem to="/settings" label="Settings" />
+                        <NavItem to="/settings/token" label="Settings" />
                     </VStack>
                 </VStack>
 
