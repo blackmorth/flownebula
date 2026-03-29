@@ -4,6 +4,7 @@ services:
       context: ./agent
       dockerfile: ../docker/Dockerfile.agent
     command:
+      - /opt/nebula/nebula-agent
       - -metrics-addr=:9108
     volumes:
       - nebula-sock:/var/run
