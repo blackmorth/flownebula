@@ -1,7 +1,21 @@
+// nebula_protocol.h
+
 #ifndef NEBULA_PROTOCOL_H
 #define NEBULA_PROTOCOL_H
 
-#include <stdint.h>
+#include <stdint.h>   // ← indispensable
+#include <stddef.h>   // ← pour size_t
+
+#include "php.h"      // ← indispensable AVANT toute macro PHP
+#include "zend.h"
+#include "zend_API.h"
+#include "zend_exceptions.h"
+#include "zend_extensions.h"
+#include "zend_compile.h"
+#include "zend_execute.h"
+#include "zend_interfaces.h"
+#include "zend_types.h"
+
 
 #define SESSION_ID_SIZE 8
 #define NEBULA_EVENT_NAME 255
@@ -9,36 +23,36 @@
 
 #pragma pack(push, 1)
 
-// event_type
-// 0 = ENTER
-// 1 = EXIT
-// 255 = NAME
+// 0 = ENTER, 1 = EXIT, 255 = NAME, 0xFE = SESSION_END
 typedef struct {
     char     session_id[SESSION_ID_SIZE];
-    uint8_t  event_type;   // 0 / 1
-    uint32_t func_id;
-    uint64_t inclusive;    // EXIT only
-    uint64_t exclusive;    // EXIT only
-    uint64_t cpu_time;     // EXIT only (exclusive)
-    int64_t  mem_delta;    // EXIT only
-    uint64_t peak_memory;  // EXIT only
-    uint64_t io_wait;      // EXIT only (blocked/wait time)
-    uint64_t network;      // EXIT only (network wait time)
-    uint64_t event_time_unix_ns; // ENTER/EXIT absolute timestamp (UTC)
-    uint64_t alloc_bytes;  // EXIT only
-    uint64_t free_bytes;   // EXIT only
+    uint8_t  kind;          // 0 = ENTER, 1 = EXIT
+
+    uint64_t ts_ns;         // horloge monotone (zend_hrtime_nebula)
+    uint32_t depth;         // profondeur d’appel
+
+    uint32_t func_id;       // identifiant stable (catalogue côté agent)
+
+    // Métadonnées gratuites
+    uint8_t  func_type;     // func->type
+    uint8_t  flags;         // bits: static, closure, generator, etc.
+    uint8_t  arg_count;     // ZEND_CALL_NUM_ARGS(execute_data)
+    uint8_t  has_exception; // EG(exception) != NULL
+    uint8_t  jit_flag;      // JIT actif sur cette frame ?
+
+    uint64_t unix_time_ns;  // timestamp absolu (corrélation)
 } nebula_event_t;
 
 /*
  * Message envoyé pour enregistrer le nom d'une fonction.
- * Identifié par event_type == NEBULA_EVENT_NAME (255).
+ * Identifié par kind == NEBULA_EVENT_NAME (255).
  */
 typedef struct {
     char     session_id[SESSION_ID_SIZE];
-    uint8_t  event_type;   /* Doit être NEBULA_EVENT_NAME (255) */
+    uint8_t  kind;       /* NEBULA_EVENT_NAME (255) */
     uint32_t func_id;
-    uint32_t name_len;     /* Longueur du nom qui suit */
-    char     name[256];    /* Nom de la fonction (tronqué à 255 + \0 si nécessaire côté agent) */
+    uint32_t name_len;
+    char     name[256];
 } nebula_name_t;
 
 #pragma pack(pop)

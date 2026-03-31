@@ -1,3 +1,5 @@
+#include "php.h"
+#include "SAPI.h"
 #include "nebula_probe.h"
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -92,7 +94,7 @@ PHP_RINIT_FUNCTION(nebula_probe)
 
     send_func_name(1, entry_name);
     NEBULA_G(request_start) = zend_hrtime_nebula();
-    emit_call(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); /* ENTER func_id=1 */
+    emit_call(0, 1, 0, 0, 0, 0, 0, 0, 0, 0); /* ENTER func_id=1 */
 
     return SUCCESS;
 }
@@ -101,17 +103,21 @@ PHP_RSHUTDOWN_FUNCTION(nebula_probe)
 {
     /* Fermeture du point d'entrée func_id=1 avec le temps total de la requête */
     uint64_t elapsed = zend_hrtime_nebula() - NEBULA_G(request_start);
-    emit_call(1, 1, elapsed, elapsed, 0, 0, 0, 0, 0, 0, 0, 0); /* EXIT func_id=1 */
+    emit_call(1, 1, elapsed, elapsed, 0, 0, 0, 0, 0, 0); /* EXIT func_id=1 */
 
     nebula_send_session_end((unsigned char *) NEBULA_G(session_id_ptr));
     flush_buffer();
     return SUCCESS;
 }
+static const zend_function_entry nebula_probe_functions[] = {
+    PHP_FE(nebula_probe_bench, NULL)
+    PHP_FE_END
+};
 
 zend_module_entry nebula_probe_module_entry = {
     STANDARD_MODULE_HEADER,
     "flow_nebula",
-    NULL,
+    nebula_probe_functions,
     PHP_MINIT(nebula_probe),
     PHP_MSHUTDOWN(nebula_probe),
     PHP_RINIT(nebula_probe),

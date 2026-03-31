@@ -36,19 +36,15 @@ services:
       - "9109:9109"
     environment:
       SERVER_METRICS_ADDR: ":9109"
-      DB_PATH: "/data/nebula.db"
-    volumes:
-      - ./data:/data
     restart: unless-stopped
-
   ui:
     build:
       context: ./ui
       dockerfile: ../docker/Dockerfile.ui
     ports:
       - "8081:80"
-    # depends_on:
-    #   - server
+    #depends_on:
+     # - server
 
   prometheus:
     image: prom/prometheus:latest

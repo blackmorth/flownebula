@@ -27,5 +27,6 @@ RUN echo "extension=nebula_probe.so" > /usr/local/etc/php/conf.d/nebula.ini \
 WORKDIR /var/www/html
 
 COPY test.php .
+COPY bench.php .
 
 CMD ["php-fpm"]
